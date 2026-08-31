@@ -112,33 +112,6 @@
             gap: 12px;
         }
         
-        /* Lens Selection Buttons */
-        #lensSelector {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        
-        .lens-btn {
-            padding: 8px 16px;
-            border: 2px solid #ddd;
-            border-radius: 20px;
-            background: white;
-            color: #333;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-            min-width: 50px;
-        }
-        
-        .lens-btn.active {
-            border-color: #007bff;
-            background: #007bff;
-            color: white;
-        }
-        
         #zoomControls {
             display: flex;
             align-items: center;
@@ -425,10 +398,6 @@
         </div>
         
         <div id="controlsBar">
-            <!-- Lens Selection -->
-            <div id="lensSelector"></div>
-            
-            <!-- Zoom Slider -->
             <div id="zoomControls">
                 <button id="zoomOut">−</button>
                 <input type="range" id="zoomSlider" min="1" max="10" value="1" step="0.1">
@@ -436,7 +405,6 @@
                 <span id="zoomLevel">1.0x</span>
             </div>
             
-            <!-- Main Controls -->
             <div id="buttonRow">
                 <button class="icon-btn" onclick="toggleFlash()" title="Flash">⚡</button>
                 <button id="shutterBtn" onclick="takePhoto()" title="Take Photo"></button>
@@ -480,7 +448,6 @@
         let usingFrontCamera = false;
         let cameras = [];
         let currentCameraIndex = -1;
-        let currentLens = '1x';
         
         async function initCamera() {
             try {
@@ -488,14 +455,27 @@
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Enumerate cameras to find the main sensor
-                await enumerateCameras();
-                
-                // Start with the main camera (1x lens)
-                await startMainCamera();
-                
-                // Display available lenses
-                displayLensButtons();
+                // Quick: Just ask for back camera
+                try {
+                    await startWithFacingMode('environment');
+                    
+                    // Enumerate cameras in background for switch button
+                    enumerateCamerasInBackground();
+                    
+                } catch (error) {
+                    console.log('Back camera failed, trying any...');
+                    
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ 
+                            video: { facingMode: 'environment' },
+                            audio: false 
+                        });
+                        video.srcObject = stream;
+                        document.getElementById('cameraStatus').textContent = '📷 Camera';
+                    } catch (finalError) {
+                        document.getElementById('cameraStatus').textContent = '❌ Camera failed';
+                    }
+                }
                 
             } catch (error) {
                 console.error('Camera init error:', error);
@@ -503,104 +483,13 @@
             }
         }
         
-        async function enumerateCameras() {
+        async function enumerateCamerasInBackground() {
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 cameras = devices.filter(device => device.kind === 'videoinput');
-                console.log('Available cameras:', cameras);
-                
-                // Identify cameras by their labels
-                cameras.forEach((camera, index) => {
-                    const label = camera.label.toLowerCase();
-                    console.log(`Camera ${index}: ${camera.label}`);
-                    
-                    // Try to identify lens type from label
-                    if (label.includes('ultra') || label.includes('wide')) {
-                        camera.lensType = '0.5x';
-                    } else if (label.includes('tele') || label.includes('zoom')) {
-                        camera.lensType = '5x';
-                    } else if (label.includes('macro')) {
-                        camera.lensType = 'macro';
-                    } else if (label.includes('front') || label.includes('selfie')) {
-                        camera.lensType = 'front';
-                    } else if (label.includes('main') || label.includes('back') || label.includes('rear')) {
-                        camera.lensType = '1x';
-                    } else {
-                        camera.lensType = '1x'; // Default to 1x
-                    }
-                });
-                
+                console.log('Available cameras for switching:', cameras);
             } catch (error) {
                 console.error('Camera enumeration failed:', error);
-            }
-        }
-        
-        async function startMainCamera() {
-            // Find the 1x (main) camera
-            let mainCameraIndex = -1;
-            
-            // First, look for cameras labeled as "main" or "back"
-            for (let i = 0; i < cameras.length; i++) {
-                const label = cameras[i].label.toLowerCase();
-                if ((label.includes('main') || label.includes('back') || label.includes('rear')) && 
-                    !label.includes('front') && !label.includes('selfie')) {
-                    mainCameraIndex = i;
-                    break;
-                }
-            }
-            
-            // If no main camera found, look for any non-front camera
-            if (mainCameraIndex === -1) {
-                for (let i = 0; i < cameras.length; i++) {
-                    const label = cameras[i].label.toLowerCase();
-                    if (!label.includes('front') && !label.includes('selfie')) {
-                        mainCameraIndex = i;
-                        break;
-                    }
-                }
-            }
-            
-            // If still no camera found, use camera 0
-            if (mainCameraIndex === -1 && cameras.length > 0) {
-                mainCameraIndex = 0;
-            }
-            
-            if (mainCameraIndex >= 0) {
-                currentCameraIndex = mainCameraIndex;
-                await startCameraWithIndex(mainCameraIndex);
-            } else {
-                // No cameras found, try facingMode
-                await startWithFacingMode('environment');
-            }
-        }
-        
-        async function startCameraWithIndex(index) {
-            try {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                }
-                
-                const constraints = {
-                    video: {
-                        deviceId: { exact: cameras[index].deviceId },
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    },
-                    audio: false
-                };
-                
-                stream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = stream;
-                
-                const track = stream.getVideoTracks()[0];
-                document.getElementById('cameraStatus').textContent = `📷 ${track.label}`;
-                usingFrontCamera = false;
-                
-            } catch (error) {
-                console.error(`Failed to start camera ${index}:`, error);
-                
-                // Fallback to facingMode
-                await startWithFacingMode('environment');
             }
         }
         
@@ -626,113 +515,48 @@
                 document.getElementById('cameraStatus').textContent = `📷 ${track.label}`;
                 usingFrontCamera = (mode === 'user');
                 
+                const capabilities = track.getCapabilities();
+                if (capabilities.zoom) {
+                    document.getElementById('zoomSlider').max = capabilities.zoom.max;
+                }
+                
             } catch (error) {
                 console.error('FacingMode failed:', error);
-                
-                // Last resort
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    video.srcObject = stream;
-                    document.getElementById('cameraStatus').textContent = '📷 Camera';
-                } catch (finalError) {
-                    document.getElementById('cameraStatus').textContent = '❌ Camera failed';
-                }
-            }
-        }
-        
-        function displayLensButtons() {
-            const lensSelector = document.getElementById('lensSelector');
-            lensSelector.innerHTML = '';
-            
-            // Collect unique lens types (excluding front cameras)
-            const lensTypes = new Set();
-            cameras.forEach(camera => {
-                if (camera.lensType !== 'front') {
-                    lensTypes.add(camera.lensType);
-                }
-            });
-            
-            // Sort lens types (0.5x, 1x, 5x, etc.)
-            const sortedLenses = Array.from(lensTypes).sort((a, b) => {
-                const aNum = parseFloat(a) || 0;
-                const bNum = parseFloat(b) || 0;
-                return aNum - bNum;
-            });
-            
-            // Add lens buttons
-            sortedLenses.forEach(lensType => {
-                const btn = document.createElement('button');
-                btn.className = 'lens-btn';
-                btn.textContent = lensType;
-                
-                if (lensType === currentLens) {
-                    btn.classList.add('active');
-                }
-                
-                btn.onclick = () => switchLens(lensType);
-                
-                lensSelector.appendChild(btn);
-            });
-            
-            // If no lens buttons were added (e.g., only facingMode), add 1x
-            if (sortedLenses.length === 0) {
-                const btn = document.createElement('button');
-                btn.className = 'lens-btn active';
-                btn.textContent = '1x';
-                btn.onclick = () => switchLens('1x');
-                lensSelector.appendChild(btn);
-            }
-        }
-        
-        async function switchLens(lensType) {
-            currentLens = lensType;
-            
-            // Update button states
-            document.querySelectorAll('.lens-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.textContent === lensType) {
-                    btn.classList.add('active');
-                }
-            });
-            
-            // Find camera with matching lens type
-            let targetIndex = -1;
-            
-            for (let i = 0; i < cameras.length; i++) {
-                if (cameras[i].lensType === lensType) {
-                    targetIndex = i;
-                    break;
-                }
-            }
-            
-            if (targetIndex >= 0) {
-                currentCameraIndex = targetIndex;
-                await startCameraWithIndex(targetIndex);
-                showNotification(`Switched to ${lensType} lens`);
-            } else {
-                // If lens not found, just adjust digital zoom
-                const zoomMap = {
-                    '0.5x': 1,
-                    '1x': 1,
-                    '2x': 2,
-                    '5x': 5,
-                    '10x': 10
-                };
-                
-                const zoomLevel = zoomMap[lensType] || 1;
-                await setZoom(zoomLevel);
-                showNotification(`Using digital ${lensType}`);
+                throw error;
             }
         }
         
         async function switchCamera() {
-            // Switch between front and back
-            usingFrontCamera = !usingFrontCamera;
-            
-            if (usingFrontCamera) {
-                await startWithFacingMode('user');
+            if (cameras.length > 0) {
+                currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+                
+                try {
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    const constraints = {
+                        video: {
+                            deviceId: { exact: cameras[currentCameraIndex].deviceId }
+                        },
+                        audio: false
+                    };
+                    
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = stream;
+                    
+                    const track = stream.getVideoTracks()[0];
+                    document.getElementById('cameraStatus').textContent = `📷 ${track.label}`;
+                    
+                    const label = track.label.toLowerCase();
+                    usingFrontCamera = label.includes('front') || label.includes('selfie');
+                    
+                } catch (error) {
+                    console.error('Switch camera failed:', error);
+                }
             } else {
-                await startMainCamera();
+                usingFrontCamera = !usingFrontCamera;
+                await startWithFacingMode(usingFrontCamera ? 'user' : 'environment');
             }
         }
         
@@ -822,7 +646,6 @@
                 results.push(result2.data.text);
                 
                 const combinedText = [...new Set(results.join('\n').split('\n'))].join('\n');
-                
                 return combinedText;
             } catch (error) {
                 console.error('OCR error:', error);
@@ -868,7 +691,6 @@
                 `;
                 
                 item.onclick = () => showQRCode(line);
-                
                 textList.appendChild(item);
             });
             
