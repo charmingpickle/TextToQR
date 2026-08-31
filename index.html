@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
-  <title>Scan → Select → QR</title>
+  <title>Tap → QR</title>
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -25,7 +25,7 @@
       flex-direction: column;
       position: relative;
     }
-    #video-container, #crop-container {
+    #video-container, #select-container {
       flex: 1;
       position: relative;
       background: #000;
@@ -39,10 +39,21 @@
       max-height: 100%;
       object-fit: contain;
     }
-    #crop-canvas {
+    #overlay {
       position: absolute;
       top: 0; left: 0;
-      touch-action: none;
+      pointer-events: none;
+    }
+    .tap-target {
+      position: absolute;
+      border: 2px solid rgba(0, 230, 118, 0.9);
+      background: rgba(0, 230, 118, 0.18);
+      border-radius: 4px;
+      pointer-events: auto;
+    }
+    .tap-target:active {
+      background: rgba(0, 122, 255, 0.4);
+      border-color: #007aff;
     }
     .camera-controls {
       position: absolute;
@@ -86,10 +97,9 @@
       text-align: center;
       font-size: 1rem;
       background: linear-gradient(rgba(0,0,0,0.65), transparent);
-      pointer-events: none;
       z-index: 10;
     }
-    .crop-controls {
+    .select-controls {
       padding: 16px;
       display: flex;
       gap: 12px;
@@ -105,92 +115,55 @@
       font-size: 1rem;
       font-weight: 500;
     }
-    button:disabled { opacity: 0.4; }
     button.secondary {
       background: #333;
       color: #eee;
     }
-    #lines {
+    #qr-view-inner {
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
+      padding: 24px 20px;
       background: #f5f5f5;
       color: #222;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
     }
-    .line {
+    #qrcode {
+      margin: 16px auto;
+      display: inline-block;
+      padding: 14px;
       background: white;
-      padding: 16px;
       border-radius: 12px;
-      font-size: 1.25rem;
-      line-height: 1.45;
-      border: 2px solid #007aff;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      word-break: break-word;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    #result-text {
+      background: white;
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 1.2rem;
       font-family: monospace;
+      border: 2px solid #007aff;
       outline: none;
+      width: 100%;
+      max-width: 340px;
+      word-break: break-word;
       min-height: 1.4em;
     }
     .hint {
       font-size: 0.85rem;
       color: #888;
       margin-top: 8px;
-      font-family: system-ui, sans-serif;
     }
-    .format-row {
+    .qr-controls {
       display: flex;
-      gap: 10px;
-      margin-top: 14px;
-      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+      width: 100%;
+      max-width: 340px;
     }
-    .format-row button {
-      flex: 1;
-      min-width: 120px;
-      padding: 10px 14px;
-      font-size: 0.9rem;
-    }
-    #candidates {
-      padding: 4px 0 16px;
-    }
-    #candidates .cand-heading {
-      font-family: system-ui, sans-serif;
-      font-size: 0.85rem;
-      color: #888;
-      margin-bottom: 10px;
-    }
-    .candidate-item {
-      background: white;
-      padding: 14px 16px;
-      border-radius: 12px;
-      font-size: 1.05rem;
-      font-family: monospace;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      word-break: break-word;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-    .candidate-item .conf {
-      font-family: system-ui, sans-serif;
-      font-size: 0.75rem;
-      color: #999;
-      white-space: nowrap;
-    }
-    #qr-section {
-      padding: 20px;
-      text-align: center;
-      background: white;
-      color: #333;
-    }
-    #qrcode {
-      margin: 12px auto;
-      display: inline-block;
-      padding: 12px;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
+    .qr-controls button { flex: 1; }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -210,54 +183,40 @@
     </div>
   </div>
 
-  <div id="crop-view" class="view hidden">
-    <div class="status-bar" id="crop-status">Drag a tight box around the text</div>
-    <div id="crop-container">
+  <div id="select-view" class="view hidden">
+    <div class="status-bar" id="select-status">Reading photo…</div>
+    <div id="select-container">
       <img id="captured-image" />
-      <canvas id="crop-canvas"></canvas>
+      <svg id="overlay"></svg>
     </div>
-    <div class="crop-controls">
-      <button id="btn-retake" class="secondary">Retake</button>
-      <button id="btn-scan-full" class="secondary">Scan Whole Photo</button>
-      <button id="btn-ocr" disabled>Read Area</button>
+    <div class="select-controls">
+      <button id="btn-retake" class="secondary">Retake Photo</button>
     </div>
   </div>
 
-  <div id="result-view" class="view hidden">
-    <div id="lines">
-      <div id="candidates" class="hidden"></div>
-      <div class="line" id="result-text" contenteditable="true" spellcheck="false"></div>
-      <div class="hint">Tap the text above to fix any misread characters.</div>
-      <div class="format-row">
-        <button id="btn-fmt-mac" class="secondary">Format as MAC</button>
-        <button id="btn-fmt-serial" class="secondary">Format as Serial</button>
-      </div>
-      <div class="format-row">
-        <button id="btn-generate-qr">Generate QR</button>
-      </div>
-    </div>
-    <div id="qr-section" class="hidden">
+  <div id="qr-view" class="view hidden">
+    <div id="qr-view-inner">
+      <div id="result-text" contenteditable="true" spellcheck="false"></div>
+      <div class="hint">Tap the text to fix any misread characters</div>
       <div id="qrcode"></div>
-      <p style="margin:12px 0;font-size:0.95rem;color:#666">Scan with another device</p>
-      <button id="btn-back" class="secondary">Scan Next Value</button>
+      <div class="qr-controls">
+        <button id="btn-pick-another" class="secondary">Pick Another Value</button>
+        <button id="btn-new-photo" class="secondary">Retake Photo</button>
+      </div>
     </div>
   </div>
 
   <script>
     const video = document.getElementById('video');
     const statusEl = document.getElementById('status');
-    const cropStatus = document.getElementById('crop-status');
+    const selectStatus = document.getElementById('select-status');
     const cameraView = document.getElementById('camera-view');
-    const cropView = document.getElementById('crop-view');
-    const resultView = document.getElementById('result-view');
+    const selectView = document.getElementById('select-view');
+    const qrView = document.getElementById('qr-view');
     const capturedImage = document.getElementById('captured-image');
-    const cropCanvas = document.getElementById('crop-canvas');
-    const ctx = cropCanvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
     const resultText = document.getElementById('result-text');
-    const candidatesEl = document.getElementById('candidates');
-    const qrSection = document.getElementById('qr-section');
     const qrcodeEl = document.getElementById('qrcode');
-    const btnOcr = document.getElementById('btn-ocr');
 
     let stream = null;
     let currentTrack = null;
@@ -265,9 +224,9 @@
     let currentDeviceIndex = 0;
     let worker = null;
     let fullCanvas = null;
-    let selection = null;
-    let isDrawing = false;
-    let startX, startY;
+    let scanCanvas = null;
+    let wordBoxes = [];
+    let qrDebounce = null;
 
     async function initCameras() {
       try {
@@ -329,98 +288,19 @@
       fullCanvas.getContext('2d').drawImage(video, 0, 0);
 
       capturedImage.src = fullCanvas.toDataURL('image/jpeg', 0.95);
-      capturedImage.onload = () => {
-        const rect = capturedImage.getBoundingClientRect();
-        const container = document.getElementById('crop-container').getBoundingClientRect();
-
-        cropCanvas.width = rect.width;
-        cropCanvas.height = rect.height;
-        cropCanvas.style.width = rect.width + 'px';
-        cropCanvas.style.height = rect.height + 'px';
-        cropCanvas.style.left = (rect.left - container.left) + 'px';
-        cropCanvas.style.top = (rect.top - container.top) + 'px';
-
-        selection = null;
-        btnOcr.disabled = true;
-        cropStatus.textContent = 'Drag a tight box around the text';
-        drawSelection();
-      };
 
       cameraView.classList.add('hidden');
-      cropView.classList.remove('hidden');
+      selectView.classList.remove('hidden');
+      selectStatus.textContent = 'Reading photo…';
+      overlay.innerHTML = '';
+
+      capturedImage.onload = () => {
+        runFullOCR();
+      };
     };
 
-    function getPos(e) {
-      const rect = cropCanvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-      };
-    }
-
-    function startDraw(e) {
-      e.preventDefault();
-      isDrawing = true;
-      const pos = getPos(e);
-      startX = pos.x;
-      startY = pos.y;
-      selection = null;
-      btnOcr.disabled = true;
-    }
-
-    function moveDraw(e) {
-      if (!isDrawing) return;
-      e.preventDefault();
-      const pos = getPos(e);
-      selection = {
-        x: Math.min(startX, pos.x),
-        y: Math.min(startY, pos.y),
-        w: Math.abs(pos.x - startX),
-        h: Math.abs(pos.y - startY)
-      };
-      drawSelection();
-    }
-
-    function endDraw() {
-      isDrawing = false;
-
-      if (selection && selection.w > 20 && selection.h > 12) {
-        btnOcr.disabled = false;
-        cropStatus.textContent = 'Reading…';
-        setTimeout(() => doOCR(), 250);
-      } else {
-        selection = null;
-        btnOcr.disabled = true;
-        cropStatus.textContent = 'Draw a bigger box around the text';
-        drawSelection();
-      }
-    }
-
-    cropCanvas.addEventListener('mousedown', startDraw);
-    cropCanvas.addEventListener('mousemove', moveDraw);
-    cropCanvas.addEventListener('mouseup', endDraw);
-    cropCanvas.addEventListener('mouseleave', endDraw);
-    cropCanvas.addEventListener('touchstart', startDraw, { passive: false });
-    cropCanvas.addEventListener('touchmove', moveDraw, { passive: false });
-    cropCanvas.addEventListener('touchend', endDraw);
-
-    function drawSelection() {
-      ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
-      if (!selection) return;
-
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
-      ctx.clearRect(selection.x, selection.y, selection.w, selection.h);
-
-      ctx.strokeStyle = '#00e676';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(selection.x, selection.y, selection.w, selection.h);
-    }
-
-    // ---- Otsu auto-threshold: picks the best black/white cutoff for THIS photo's
-    // lighting instead of a single fixed contrast multiplier that only works sometimes.
+    // ---- Otsu auto-threshold: adapts the black/white cutoff to this photo's
+    // lighting instead of one fixed setting that only works sometimes.
     function otsuThreshold(grayValues) {
       const hist = new Array(256).fill(0);
       for (let i = 0; i < grayValues.length; i++) hist[grayValues[i]]++;
@@ -462,8 +342,8 @@
 
       const threshold = otsuThreshold(gray);
 
-      // Detect dark-text-on-light-background vs light-text-on-dark-background
-      // so we always end up with black text on white, which Tesseract likes best.
+      // Handles both dark-text-on-light-background (paper) and
+      // light-text-on-dark-background (BIOS/monitor screens) automatically.
       let darkCount = 0;
       for (let j = 0; j < gray.length; j++) if (gray[j] < threshold) darkCount++;
       const textIsDark = darkCount < gray.length / 2;
@@ -476,97 +356,11 @@
       cctx.putImageData(imgData, 0, 0);
     }
 
-    async function runTesseract(canvas, psm) {
-      if (!worker) worker = await Tesseract.createWorker('eng');
-      await worker.setParameters({
-        tessedit_pageseg_mode: psm,
-        tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-:',
-        preserve_interword_spaces: '0'
-      });
-      const { data } = await worker.recognize(canvas);
-      return data.text.replace(/[^0-9A-Z\-:]/g, '').trim();
-    }
-
-    async function doOCR() {
-      if (!selection || !fullCanvas) return;
-      btnOcr.disabled = true;
-
-      const scaleX = fullCanvas.width / cropCanvas.width;
-      const scaleY = fullCanvas.height / cropCanvas.height;
-
-      // Pad the selection ~12% so a tight box doesn't clip character edges.
-      const padX = selection.w * 0.12;
-      const padY = selection.h * 0.25;
-
-      const sx = Math.max(0, (selection.x - padX) * scaleX);
-      const sy = Math.max(0, (selection.y - padY) * scaleY);
-      const sw = Math.min((selection.w + padX * 2) * scaleX, fullCanvas.width - sx);
-      const sh = Math.min((selection.h + padY * 2) * scaleY, fullCanvas.height - sy);
-
-      // Adaptive upscale: aim for roughly 50px-tall text, which is Tesseract's
-      // sweet spot, instead of a flat 2.2x that's wrong for near vs far shots.
-      const targetTextHeight = 50;
-      let upscale = targetTextHeight / sh;
-      upscale = Math.max(1.5, Math.min(upscale, 6));
-
-      const targetW = Math.round(sw * upscale);
-      const targetH = Math.round(sh * upscale);
-
-      const crop = document.createElement('canvas');
-      crop.width = targetW;
-      crop.height = targetH;
-      const cctx = crop.getContext('2d');
-      cctx.imageSmoothingEnabled = true;
-      cctx.imageSmoothingQuality = 'high';
-      cctx.drawImage(fullCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
-
-      preprocess(crop);
-
-      try {
-        // Single line mode first (fastest, most accurate for a tight crop).
-        let cleaned = await runTesseract(crop, '7');
-
-        // If that came back empty/too short, retry as a single word / raw block —
-        // covers cases where the box caught only part of a line or odd spacing.
-        if (!cleaned || cleaned.length < 2) {
-          cleaned = await runTesseract(crop, '8');
-        }
-        if (!cleaned || cleaned.length < 2) {
-          cleaned = await runTesseract(crop, '6');
-        }
-
-        if (!cleaned || cleaned.length < 2) {
-          cropStatus.textContent = 'No text found – try a tighter box';
-          btnOcr.disabled = false;
-          return;
-        }
-
-        resultText.textContent = cleaned;
-        candidatesEl.classList.add('hidden');
-        qrSection.classList.add('hidden');
-
-        cropView.classList.add('hidden');
-        resultView.classList.remove('hidden');
-      } catch (err) {
-        console.error(err);
-        cropStatus.textContent = 'Reading failed – try again';
-        btnOcr.disabled = false;
-      }
-    }
-
-    btnOcr.onclick = doOCR;
-
-    async function scanFullPhoto() {
-      if (!fullCanvas) return;
-      cropStatus.textContent = 'Scanning whole photo…';
-      btnOcr.disabled = true;
-
-      // Downscale huge camera photos before OCR — keeps this fast without
-      // losing meaningful accuracy (text is usually much smaller than the
-      // full sensor resolution anyway).
+    async function runFullOCR() {
+      // Downscale huge camera photos before OCR for speed.
       const maxDim = 2000;
-      let scale = Math.min(1, maxDim / Math.max(fullCanvas.width, fullCanvas.height));
-      const scanCanvas = document.createElement('canvas');
+      const scale = Math.min(1, maxDim / Math.max(fullCanvas.width, fullCanvas.height));
+      scanCanvas = document.createElement('canvas');
       scanCanvas.width = Math.round(fullCanvas.width * scale);
       scanCanvas.height = Math.round(fullCanvas.height * scale);
       scanCanvas.getContext('2d').drawImage(fullCanvas, 0, 0, scanCanvas.width, scanCanvas.height);
@@ -575,8 +369,8 @@
 
       try {
         if (!worker) worker = await Tesseract.createWorker('eng');
-        // Sparse-text mode: looks for text anywhere in the image in any
-        // arrangement, which fits labels with several unrelated strings on them.
+        // Sparse-text mode: finds text anywhere on screen regardless of layout —
+        // good fit for BIOS/label screens with several unrelated fields.
         await worker.setParameters({
           tessedit_pageseg_mode: '11',
           tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-:',
@@ -584,93 +378,80 @@
         });
         const { data } = await worker.recognize(scanCanvas);
 
-        const seen = new Set();
-        const candidates = [];
-        const blocks = (data.lines && data.lines.length ? data.lines : data.words) || [];
+        wordBoxes = (data.words || [])
+          .map(w => ({
+            text: (w.text || '').replace(/[^0-9A-Z\-:]/g, '').trim(),
+            bbox: w.bbox
+          }))
+          .filter(w => w.text.length >= 2);
 
-        for (const b of blocks) {
-          const cleaned = (b.text || '').replace(/[^0-9A-Z\-:]/g, '').trim();
-          if (cleaned.length < 2 || seen.has(cleaned)) continue;
-          seen.add(cleaned);
-          candidates.push({ text: cleaned, confidence: Math.round(b.confidence || 0) });
-        }
-
-        candidates.sort((a, b) => b.confidence - a.confidence);
-
-        if (!candidates.length) {
-          cropStatus.textContent = 'No text found in photo';
-          btnOcr.disabled = false;
+        if (!wordBoxes.length) {
+          selectStatus.textContent = 'No text found — retake and try again';
           return;
         }
 
-        renderCandidates(candidates);
-        cropView.classList.add('hidden');
-        resultView.classList.remove('hidden');
-        cropStatus.textContent = 'Drag a tight box around the text';
-        btnOcr.disabled = true;
+        selectStatus.textContent = 'Tap the value you want';
+        drawTapTargets();
       } catch (err) {
         console.error(err);
-        cropStatus.textContent = 'Scan failed – try again';
-        btnOcr.disabled = false;
+        selectStatus.textContent = 'Reading failed – retake and try again';
       }
     }
 
-    function renderCandidates(candidates) {
-      candidatesEl.innerHTML = '<div class="cand-heading">Tap the text you want:</div>';
-      candidatesEl.classList.remove('hidden');
-      qrSection.classList.add('hidden');
-      resultText.textContent = '';
+    function drawTapTargets() {
+      const rect = capturedImage.getBoundingClientRect();
+      const container = document.getElementById('select-container').getBoundingClientRect();
+      const offsetLeft = rect.left - container.left;
+      const offsetTop = rect.top - container.top;
 
-      candidates.forEach(c => {
-        const item = document.createElement('div');
-        item.className = 'candidate-item';
-        const span = document.createElement('span');
-        span.textContent = c.text;
-        const conf = document.createElement('span');
-        conf.className = 'conf';
-        conf.textContent = c.confidence + '%';
-        item.appendChild(span);
-        item.appendChild(conf);
-        item.onclick = () => {
-          resultText.textContent = c.text;
-          candidatesEl.classList.add('hidden');
-        };
-        candidatesEl.appendChild(item);
+      overlay.setAttribute('width', rect.width);
+      overlay.setAttribute('height', rect.height);
+      overlay.style.left = offsetLeft + 'px';
+      overlay.style.top = offsetTop + 'px';
+      overlay.style.width = rect.width + 'px';
+      overlay.style.height = rect.height + 'px';
+      overlay.innerHTML = '';
+
+      const sx = rect.width / scanCanvas.width;
+      const sy = rect.height / scanCanvas.height;
+      const pad = 4;
+
+      wordBoxes.forEach(w => {
+        const x = w.bbox.x0 * sx - pad;
+        const y = w.bbox.y0 * sy - pad;
+        const width = (w.bbox.x1 - w.bbox.x0) * sx + pad * 2;
+        const height = (w.bbox.y1 - w.bbox.y0) * sy + pad * 2;
+
+        const div = document.createElement('div');
+        div.className = 'tap-target';
+        div.style.left = x + 'px';
+        div.style.top = y + 'px';
+        div.style.width = Math.max(width, 30) + 'px';
+        div.style.height = Math.max(height, 26) + 'px';
+        div.onclick = () => selectValue(w.text);
+        // append to a positioned wrapper instead of the svg itself
+        overlay.parentElement.appendChild(div);
+        div.style.position = 'absolute';
+        div.style.left = (offsetLeft + x) + 'px';
+        div.style.top = (offsetTop + y) + 'px';
       });
     }
 
-    document.getElementById('btn-scan-full').onclick = scanFullPhoto;
+    function selectValue(text) {
+      resultText.textContent = text;
+      selectView.classList.add('hidden');
+      qrView.classList.remove('hidden');
+      generateQR(text);
+    }
 
-    // Characters that never legitimately appear in a hex MAC address, mapped
-    // to the digit they're most often confused with by OCR.
-    const HEX_FIXUP = { O: '0', S: '5', B: '8', Z: '2', G: '6', Q: '0', I: '1', L: '1', T: '7' };
-
-    document.getElementById('btn-fmt-mac').onclick = () => {
-      let raw = resultText.textContent.toUpperCase().replace(/[^0-9A-Z]/g, '');
-      raw = raw.split('').map(c => (/[0-9A-F]/.test(c) ? c : (HEX_FIXUP[c] || c))).join('');
-      raw = raw.slice(0, 12);
-      const pairs = raw.match(/.{1,2}/g) || [];
-      resultText.textContent = pairs.join(':');
-    };
-
-    document.getElementById('btn-fmt-serial').onclick = () => {
-      resultText.textContent = resultText.textContent.toUpperCase().replace(/\s+/g, '').trim();
-    };
-
-    document.getElementById('btn-generate-qr').onclick = () => {
-      const text = resultText.textContent.trim();
-      if (!text) return;
-      showQR(text);
-    };
-
-    function showQR(text) {
+    function generateQR(text) {
       qrcodeEl.innerHTML = '';
-      qrSection.classList.remove('hidden');
+      if (!text.trim()) return;
       try {
         new QRCode(qrcodeEl, {
-          text: text,
-          width: 240,
-          height: 240,
+          text: text.trim(),
+          width: 220,
+          height: 220,
           correctLevel: QRCode.CorrectLevel.M
         });
       } catch (e) {
@@ -678,19 +459,28 @@
       }
     }
 
-    document.getElementById('btn-retake').onclick = () => {
-      cropView.classList.add('hidden');
-      cameraView.classList.remove('hidden');
-      statusEl.textContent = 'Point at the text';
+    resultText.addEventListener('input', () => {
+      clearTimeout(qrDebounce);
+      qrDebounce = setTimeout(() => generateQR(resultText.textContent), 250);
+    });
+
+    document.getElementById('btn-retake').onclick = resetToCamera;
+    document.getElementById('btn-new-photo').onclick = resetToCamera;
+
+    document.getElementById('btn-pick-another').onclick = () => {
+      qrView.classList.add('hidden');
+      selectView.classList.remove('hidden');
+      // Redraw in case the viewport changed while the QR view was up.
+      drawTapTargets();
     };
 
-    document.getElementById('btn-back').onclick = () => {
-      resultView.classList.add('hidden');
-      candidatesEl.classList.add('hidden');
-      resultText.textContent = '';
+    function resetToCamera() {
+      qrView.classList.add('hidden');
+      selectView.classList.add('hidden');
+      overlay.parentElement.querySelectorAll('.tap-target').forEach(el => el.remove());
       cameraView.classList.remove('hidden');
       statusEl.textContent = 'Point at the text';
-    };
+    }
 
     initCameras();
   </script>
