@@ -443,56 +443,9 @@
     <script>
         let video = document.getElementById('cameraFeed');
         let stream = null;
-        let currentCameraIndex = -1;
-        let cameras = [];
         let flashOn = false;
         let currentZoom = 1;
-        
-        async function listCameras(showSelector = true) {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                cameras = devices.filter(device => device.kind === 'videoinput');
-                console.log('Found cameras:', cameras);
-                
-                // Try to identify the best back camera
-                if (cameras.length > 0) {
-                    currentCameraIndex = findBestBackCamera(cameras);
-                }
-                
-                return cameras;
-            } catch (error) {
-                console.error('List cameras error:', error);
-                return [];
-            }
-        }
-        
-        function findBestBackCamera(cameraList) {
-            // Priority order for camera selection
-            for (let i = 0; i < cameraList.length; i++) {
-                const label = cameraList[i].label.toLowerCase();
-                
-                // Skip front cameras
-                if (label.includes('front') || label.includes('selfie') || label.includes('user')) {
-                    continue;
-                }
-                
-                // Look for main/back camera indicators
-                if (label.includes('back') || 
-                    label.includes('rear') || 
-                    label.includes('main') ||
-                    label.includes('wide') ||
-                    label.includes('environment') ||
-                    label.includes('camera 0') ||
-                    label.includes('camera 1')) {
-                    console.log('Selected camera:', cameraList[i].label);
-                    return i;
-                }
-            }
-            
-            // If no clear back camera found, use the last one (usually back on Android)
-            console.log('Using last camera as fallback:', cameraList[cameraList.length - 1].label);
-            return cameraList.length - 1;
-        }
+        let usingFrontCamera = false;
         
         async function initCamera() {
             try {
@@ -500,78 +453,80 @@
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                await listCameras(false);
-                await startCamera(currentCameraIndex);
+                // Simple, direct request for back camera
+                await startBackCamera();
+                
             } catch (error) {
                 console.error('Camera init error:', error);
                 document.getElementById('cameraStatus').textContent = 'Camera error';
             }
         }
         
-        async function startCamera(index) {
+        async function startBackCamera() {
             try {
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                let constraints;
-                
-                // If we have cameras and an index, try specific camera
-                if (index >= 0 && cameras[index]) {
-                    constraints = {
-                        video: {
-                            deviceId: { exact: cameras[index].deviceId },
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 },
-                            facingMode: 'environment'
-                        },
-                        audio: false
-                    };
-                } else {
-                    // Default to environment (back camera)
-                    constraints = {
-                        video: {
-                            facingMode: 'environment',
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
-                        },
-                        audio: false
-                    };
-                }
+                // Direct request for back camera - works on both iOS and Android
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                };
                 
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
                 const track = stream.getVideoTracks()[0];
-                const label = track.label || 'Camera';
-                document.getElementById('cameraStatus').textContent = `📷 ${label}`;
+                document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Back Camera'}`;
+                usingFrontCamera = false;
                 
+                // Get zoom capabilities
                 const capabilities = track.getCapabilities();
                 if (capabilities.zoom) {
                     document.getElementById('zoomSlider').max = capabilities.zoom.max;
                 }
                 
             } catch (error) {
-                console.error('Start camera error:', error);
+                console.log('Standard back camera failed, trying alternative...');
                 
-                // Fallback: Just request back camera without device ID
+                // Try without width/height constraints
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: { ideal: 'environment' },
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
-                        } 
-                    });
+                    const constraints = {
+                        video: {
+                            facingMode: 'environment'
+                        },
+                        audio: false
+                    };
+                    
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
                     video.srcObject = stream;
-                    document.getElementById('cameraStatus').textContent = '📷 Back Camera';
+                    
+                    const track = stream.getVideoTracks()[0];
+                    document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Back Camera'}`;
+                    usingFrontCamera = false;
+                    
                 } catch (fallbackError) {
+                    console.log('Alternative back camera failed, trying any camera...');
+                    
                     // Last resort: any camera
                     try {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        stream = await navigator.mediaDevices.getUserMedia({ 
+                            video: true,
+                            audio: false 
+                        });
                         video.srcObject = stream;
-                        document.getElementById('cameraStatus').textContent = '📷 Camera';
+                        
+                        const track = stream.getVideoTracks()[0];
+                        document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Camera'}`;
+                        usingFrontCamera = false;
+                        
                     } catch (finalError) {
+                        console.error('All camera attempts failed:', finalError);
                         document.getElementById('cameraStatus').textContent = '❌ Camera failed';
                     }
                 }
@@ -579,38 +534,49 @@
         }
         
         async function switchCamera() {
-            // Toggle between front and back cameras
-            if (cameras.length > 0) {
-                // Find current camera type
-                const currentLabel = cameras[currentCameraIndex]?.label.toLowerCase() || '';
-                const isCurrentlyFront = currentLabel.includes('front') || currentLabel.includes('selfie');
+            try {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
                 
-                // Find the opposite camera
-                let targetIndex = -1;
+                // Toggle between front and back
+                usingFrontCamera = !usingFrontCamera;
                 
-                for (let i = 0; i < cameras.length; i++) {
-                    const label = cameras[i].label.toLowerCase();
-                    const isFront = label.includes('front') || label.includes('selfie');
+                const constraints = {
+                    video: {
+                        facingMode: usingFrontCamera ? 'user' : 'environment'
+                    },
+                    audio: false
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                const track = stream.getVideoTracks()[0];
+                document.getElementById('cameraStatus').textContent = `📷 ${track.label || (usingFrontCamera ? 'Front Camera' : 'Back Camera')}`;
+                
+            } catch (error) {
+                console.error('Switch camera error:', error);
+                
+                // Try to go back to back camera
+                try {
+                    const constraints = {
+                        video: {
+                            facingMode: 'environment'
+                        },
+                        audio: false
+                    };
                     
-                    if (isCurrentlyFront && !isFront) {
-                        targetIndex = i;
-                        break;
-                    } else if (!isCurrentlyFront && isFront) {
-                        targetIndex = i;
-                        break;
-                    }
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    video.srcObject = stream;
+                    usingFrontCamera = false;
+                    
+                    const track = stream.getVideoTracks()[0];
+                    document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Back Camera'}`;
+                    
+                } catch (fallbackError) {
+                    showNotification('Cannot switch camera');
                 }
-                
-                // If no opposite found, cycle to next camera
-                if (targetIndex === -1) {
-                    targetIndex = (currentCameraIndex + 1) % cameras.length;
-                }
-                
-                currentCameraIndex = targetIndex;
-                await startCamera(currentCameraIndex);
-            } else {
-                // No camera list, just toggle facingMode
-                await startCamera(-1);
             }
         }
         
@@ -823,10 +789,8 @@
             }, 2000);
         }
         
-        window.addEventListener('DOMContentLoaded', async () => {
-            // List cameras first, then start with the best one
-            await listCameras(false);
-            await initCamera();
+        window.addEventListener('DOMContentLoaded', () => {
+            initCamera();
         });
     </script>
 </body>
