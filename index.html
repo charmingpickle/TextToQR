@@ -5,16 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BIOS Scanner</title>
     
-    <!-- Libraries -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
     <style>
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         html, body {
             height: 100%;
@@ -88,37 +83,10 @@
             opacity: 0.8;
         }
         
-        #corner-tl {
-            top: 10px;
-            left: 10px;
-            border-right: none;
-            border-bottom: none;
-            border-top-left-radius: 10px;
-        }
-        
-        #corner-tr {
-            top: 10px;
-            right: 10px;
-            border-left: none;
-            border-bottom: none;
-            border-top-right-radius: 10px;
-        }
-        
-        #corner-bl {
-            bottom: 10px;
-            left: 10px;
-            border-right: none;
-            border-top: none;
-            border-bottom-left-radius: 10px;
-        }
-        
-        #corner-br {
-            bottom: 10px;
-            right: 10px;
-            border-left: none;
-            border-top: none;
-            border-bottom-right-radius: 10px;
-        }
+        #corner-tl { top: 10px; left: 10px; border-right: none; border-bottom: none; border-top-left-radius: 10px; }
+        #corner-tr { top: 10px; right: 10px; border-left: none; border-bottom: none; border-top-right-radius: 10px; }
+        #corner-bl { bottom: 10px; left: 10px; border-right: none; border-top: none; border-bottom-left-radius: 10px; }
+        #corner-br { bottom: 10px; right: 10px; border-left: none; border-top: none; border-bottom-right-radius: 10px; }
         
         #cameraSelector {
             position: absolute;
@@ -148,15 +116,8 @@
             border-radius: 5px;
         }
         
-        .camera-option:hover {
-            background: #f0f0f0;
-        }
-        
-        .camera-option.active {
-            background: #e3f2fd;
-            color: #007bff;
-            font-weight: bold;
-        }
+        .camera-option:hover { background: #f0f0f0; }
+        .camera-option.active { background: #e3f2fd; color: #007bff; font-weight: bold; }
         
         #cameraStatus {
             position: absolute;
@@ -203,16 +164,9 @@
             justify-content: center;
         }
         
-        #zoomOut:active, #zoomIn:active {
-            background: #007bff;
-            color: white;
-        }
+        #zoomOut:active, #zoomIn:active { background: #007bff; color: white; }
         
-        #zoomSlider {
-            flex: 1;
-            accent-color: #007bff;
-            height: 4px;
-        }
+        #zoomSlider { flex: 1; accent-color: #007bff; height: 4px; }
         
         #zoomLevel {
             min-width: 40px;
@@ -244,15 +198,8 @@
             flex-shrink: 0;
         }
         
-        .icon-btn:active {
-            background: #f0f0f0;
-            transform: scale(0.95);
-        }
-        
-        .icon-btn.active {
-            border-color: #007bff;
-            background: #e3f2fd;
-        }
+        .icon-btn:active { background: #f0f0f0; transform: scale(0.95); }
+        .icon-btn.active { border-color: #007bff; background: #e3f2fd; }
         
         #shutterBtn {
             width: 70px;
@@ -266,10 +213,7 @@
             transition: all 0.2s;
         }
         
-        #shutterBtn:active {
-            background: #007bff;
-            transform: scale(0.95);
-        }
+        #shutterBtn:active { background: #007bff; transform: scale(0.95); }
         
         #shutterBtn::after {
             content: '';
@@ -284,10 +228,7 @@
             border: 3px solid #007bff;
         }
         
-        #shutterBtn:active::after {
-            background: #007bff;
-            border-color: white;
-        }
+        #shutterBtn:active::after { background: #007bff; border-color: white; }
         
         #processing {
             position: fixed;
@@ -318,25 +259,21 @@
             100% { transform: rotate(360deg); }
         }
         
-        #processingText {
-            color: #333;
-            font-size: 16px;
-            font-weight: 500;
-        }
+        #processingText { color: #333; font-size: 16px; font-weight: 500; }
         
-        #selectionScreen {
+        #resultsScreen {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: white;
+            background: #f5f5f5;
             display: none;
             flex-direction: column;
             z-index: 50;
         }
         
-        #selectionHeader {
+        #resultsHeader {
             flex-shrink: 0;
             padding: 15px;
             background: white;
@@ -346,7 +283,7 @@
             border-bottom: 2px solid #e0e0e0;
         }
         
-        #selectionHeader button {
+        #resultsHeader button {
             padding: 10px 15px;
             border: none;
             border-radius: 8px;
@@ -357,70 +294,101 @@
             cursor: pointer;
         }
         
-        #selectionHeader button:active {
-            background: #0056b3;
-        }
-        
-        #imageWrapper {
+        #resultsContent {
             flex: 1;
-            position: relative;
-            overflow: auto;
-            min-height: 0;
-            background: #f8f8f8;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .detected-section {
+            margin-bottom: 20px;
+        }
+        
+        .detected-section h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .detected-item {
+            background: white;
             padding: 15px;
-        }
-        
-        #imageContainer {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
-        
-        #processedImage {
-            width: 100%;
-            height: auto;
-            display: block;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        #textOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        
-        .text-box {
-            position: absolute;
-            border: 2px solid #00ff00;
-            background: rgba(0, 255, 0, 0.15);
+            margin-bottom: 10px;
+            border-radius: 10px;
             cursor: pointer;
+            border: 2px solid #e0e0e0;
             transition: all 0.2s;
-            min-height: 20px;
-            border-radius: 3px;
-            pointer-events: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
-        .text-box:active {
-            background: rgba(0, 255, 0, 0.4);
-            border-color: #00ff00;
+        .detected-item:hover, .detected-item:active {
+            border-color: #007bff;
+            background: #f8f9ff;
         }
         
-        .text-box.selected {
-            background: rgba(0, 255, 0, 0.5);
-            border: 3px solid #00ff00;
-            box-shadow: 0 0 10px #00ff00;
+        .detected-item.selected {
+            border-color: #007bff;
+            background: #e3f2fd;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.2);
+        }
+        
+        .detected-item .label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .detected-item .value {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .all-text-section {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .all-text-section h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .text-lines {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .text-line {
+            padding: 10px;
+            margin-bottom: 5px;
+            background: #f8f8f8;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .text-line:hover, .text-line:active {
+            background: #e3f2fd;
+        }
+        
+        .text-line.selected {
+            background: #e3f2fd;
+            border-left: 4px solid #007bff;
         }
         
         #bottomPanel {
             flex-shrink: 0;
             background: white;
             padding: 15px;
-            max-height: 200px;
-            overflow-y: auto;
             border-top: 2px solid #e0e0e0;
         }
         
@@ -476,14 +444,11 @@
         <div id="cameraFrameContainer">
             <div id="cameraFrame">
                 <video id="cameraFeed" autoplay playsinline></video>
-                
                 <div class="corner-marker" id="corner-tl"></div>
                 <div class="corner-marker" id="corner-tr"></div>
                 <div class="corner-marker" id="corner-bl"></div>
                 <div class="corner-marker" id="corner-br"></div>
-                
                 <div id="cameraSelector"></div>
-                
                 <div id="cameraStatus">Loading camera...</div>
             </div>
         </div>
@@ -509,22 +474,26 @@
         <div id="processingText">Processing...</div>
     </div>
     
-    <div id="selectionScreen">
-        <div id="selectionHeader">
+    <div id="resultsScreen">
+        <div id="resultsHeader">
             <button onclick="retakePhoto()">📸 Retake</button>
-            <span style="color:#333; font-weight:bold;">Tap Text to Select</span>
+            <span style="color:#333; font-weight:bold;">Select Data</span>
             <button onclick="clearSelection()">Clear</button>
         </div>
         
-        <div id="imageWrapper">
-            <div id="imageContainer">
-                <img id="processedImage" alt="Processed Image">
-                <div id="textOverlay"></div>
+        <div id="resultsContent">
+            <!-- Auto-detected items will appear here -->
+            <div class="detected-section" id="detectedItems"></div>
+            
+            <!-- All text lines fallback -->
+            <div class="all-text-section">
+                <h3>All Detected Text</h3>
+                <div class="text-lines" id="allTextLines"></div>
             </div>
         </div>
         
         <div id="bottomPanel">
-            <div id="selectedText">Tap on text in the image</div>
+            <div id="selectedText">Tap on any value to select</div>
             <div id="qrContainer">
                 <canvas id="qrCanvas"></canvas>
             </div>
@@ -534,24 +503,21 @@
     <div id="notification"></div>
     
     <script>
+        // [Camera code stays the same as before - initCamera, listCameras, etc.]
         let video = document.getElementById('cameraFeed');
         let stream = null;
         let cameras = [];
         let currentCameraIndex = -1;
         let flashOn = false;
         let currentZoom = 1;
-        let imageWidth = 0;
-        let imageHeight = 0;
         
         async function initCamera() {
             try {
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
-                
                 await listCameras(false);
                 await startCamera(currentCameraIndex);
-                
             } catch (error) {
                 console.error('Camera init error:', error);
                 document.getElementById('cameraStatus').textContent = 'Camera error';
@@ -562,13 +528,7 @@
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 cameras = devices.filter(device => device.kind === 'videoinput');
-                
-                console.log('Found cameras:', cameras);
-                
-                if (showSelector) {
-                    displayCameraSelector();
-                }
-                
+                if (showSelector) displayCameraSelector();
                 return cameras;
             } catch (error) {
                 console.error('List cameras error:', error);
@@ -579,24 +539,18 @@
         function displayCameraSelector() {
             const selector = document.getElementById('cameraSelector');
             selector.innerHTML = '';
-            
             if (cameras.length === 0) {
                 selector.innerHTML = '<div style="padding:10px; color:#666;">No cameras found</div>';
             } else {
                 cameras.forEach((camera, index) => {
                     const btn = document.createElement('button');
                     btn.className = 'camera-option';
-                    if (index === currentCameraIndex) {
-                        btn.classList.add('active');
-                    }
+                    if (index === currentCameraIndex) btn.classList.add('active');
                     btn.textContent = camera.label || `Camera ${index + 1}`;
-                    btn.onclick = () => {
-                        switchToCamera(index);
-                    };
+                    btn.onclick = () => switchToCamera(index);
                     selector.appendChild(btn);
                 });
             }
-            
             selector.style.display = 'block';
         }
         
@@ -617,12 +571,9 @@
         
         async function startCamera(index) {
             try {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                }
+                if (stream) stream.getTracks().forEach(track => track.stop());
                 
                 let constraints;
-                
                 if (index >= 0 && cameras[index]) {
                     constraints = {
                         video: {
@@ -654,10 +605,8 @@
                 if (capabilities.zoom) {
                     document.getElementById('zoomSlider').max = capabilities.zoom.max;
                 }
-                
             } catch (error) {
                 console.error('Start camera error:', error);
-                
                 try {
                     stream = await navigator.mediaDevices.getUserMedia({ video: true });
                     video.srcObject = stream;
@@ -673,13 +622,9 @@
                 if (stream) {
                     const track = stream.getVideoTracks()[0];
                     const capabilities = track.getCapabilities();
-                    
                     if (capabilities.torch) {
                         flashOn = !flashOn;
-                        await track.applyConstraints({
-                            advanced: [{ torch: flashOn }]
-                        });
-                        
+                        await track.applyConstraints({ advanced: [{ torch: flashOn }] });
                         showNotification(flashOn ? 'Flash ON' : 'Flash OFF');
                     } else {
                         showNotification('No flash on this camera');
@@ -690,39 +635,24 @@
             }
         }
         
-        document.getElementById('zoomIn').addEventListener('click', () => {
-            setZoom(currentZoom + 0.5);
-        });
-        
-        document.getElementById('zoomOut').addEventListener('click', () => {
-            setZoom(currentZoom - 0.5);
-        });
-        
-        document.getElementById('zoomSlider').addEventListener('input', (e) => {
-            setZoom(parseFloat(e.target.value));
-        });
+        document.getElementById('zoomIn').addEventListener('click', () => setZoom(currentZoom + 0.5));
+        document.getElementById('zoomOut').addEventListener('click', () => setZoom(currentZoom - 0.5));
+        document.getElementById('zoomSlider').addEventListener('input', (e) => setZoom(parseFloat(e.target.value)));
         
         async function setZoom(level) {
             currentZoom = Math.max(1, Math.min(level, 10));
-            
             try {
                 if (stream) {
                     const track = stream.getVideoTracks()[0];
                     const capabilities = track.getCapabilities();
-                    
                     if (capabilities.zoom) {
-                        await track.applyConstraints({
-                            advanced: [{ zoom: currentZoom }]
-                        });
+                        await track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
                     } else {
-                        const scale = currentZoom;
-                        video.style.transform = `scale(${scale})`;
+                        video.style.transform = `scale(${currentZoom})`;
                     }
                 }
-                
                 document.getElementById('zoomLevel').textContent = `${currentZoom.toFixed(1)}x`;
                 document.getElementById('zoomSlider').value = currentZoom;
-                
             } catch (error) {
                 console.error('Zoom error:', error);
             }
@@ -739,16 +669,15 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0);
                 
-                document.getElementById('processingText').textContent = 'Processing image...';
+                document.getElementById('processingText').textContent = 'Processing...';
                 const processedCanvas = await processImage(canvas);
                 
                 document.getElementById('processingText').textContent = 'Reading text...';
-                const ocrData = await runOCR(processedCanvas);
+                const ocrText = await runOCR(processedCanvas);
                 
-                showSelectionScreen(processedCanvas, ocrData);
+                showResults(ocrText);
                 
                 document.getElementById('processing').style.display = 'none';
-                
             } catch (error) {
                 console.error('Photo error:', error);
                 document.getElementById('processing').style.display = 'none';
@@ -757,320 +686,168 @@
         }
         
         async function processImage(canvas) {
-            const ctx = canvas.getContext('2d');
-            
-            // Just upscale and increase contrast slightly, don't threshold
-            const scale = 3;
+            const scale = 2;
             const upscaled = document.createElement('canvas');
             upscaled.width = canvas.width * scale;
             upscaled.height = canvas.height * scale;
             const upCtx = upscaled.getContext('2d');
-            
             upCtx.imageSmoothingEnabled = true;
             upCtx.imageSmoothingQuality = 'high';
             upCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, upscaled.width, upscaled.height);
             
-            // Get image data for enhancement
             const imageData = upCtx.getImageData(0, 0, upscaled.width, upscaled.height);
             const data = imageData.data;
             
-            // Enhance contrast and sharpness without going full binary
             for (let i = 0; i < data.length; i += 4) {
-                // Convert to grayscale
                 const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                
-                // Apply contrast enhancement (softer than thresholding)
-                const contrast = 1.3;
+                const contrast = 1.2;
                 const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
                 const enhanced = factor * (gray - 128) + 128;
-                
-                // Clamp to valid range
                 const clamped = Math.max(0, Math.min(255, enhanced));
-                
-                // Keep it as grayscale, don't force black/white
                 data[i] = clamped;
                 data[i + 1] = clamped;
                 data[i + 2] = clamped;
             }
             
             upCtx.putImageData(imageData, 0, 0);
-            
             return upscaled;
         }
         
         async function runOCR(canvas) {
             try {
-                // Run OCR with multiple configurations and pick the best result
-                const configs = [
-                    {
-                        // First pass: Standard OCR - more inclusive
-                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
-                        tessedit_pageseg_mode: '6',
-                        preserve_interword_spaces: '1',
-                        tessedit_ocr_engine_mode: '2',
-                        tessedit_do_invert: '0',
-                        tessedit_unrej_any_wd: '1',
-                        user_defined_dpi: '300'
-                    },
-                    {
-                        // Second pass: Sparse text - good for serial numbers
-                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
-                        tessedit_pageseg_mode: '11', // Sparse text mode
-                        preserve_interword_spaces: '1',
-                        tessedit_ocr_engine_mode: '2',
-                        tessedit_unrej_any_wd: '1',
-                        user_defined_dpi: '300'
-                    }
-                ];
+                const result = await Tesseract.recognize(canvas, 'eng', {
+                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
+                    tessedit_pageseg_mode: '6',
+                    preserve_interword_spaces: '1',
+                    tessedit_ocr_engine_mode: '2'
+                });
                 
-                let allResults = [];
-                
-                for (const config of configs) {
-                    const result = await Tesseract.recognize(canvas, 'eng', config);
-                    console.log('OCR confidence:', result.data.confidence);
-                    console.log('OCR text:', result.data.text);
-                    allResults.push(result.data);
-                }
-                
-                // Merge results - use words from both passes
-                let bestResult = allResults[0]; // Default to first result
-                
-                // If second pass found more words, use it
-                if (allResults[1] && allResults[1].words && allResults[1].words.length > allResults[0].words.length) {
-                    bestResult = allResults[1];
-                }
-                
-                // If neither found words, try to use text
-                if (!bestResult.words || bestResult.words.length === 0) {
-                    if (allResults[0].text) {
-                        bestResult = allResults[0];
-                    }
-                }
-                
-                // Post-process the text
-                if (bestResult) {
-                    bestResult.text = fixOCRText(bestResult.text);
-                    
-                    if (bestResult.words) {
-                        bestResult.words = bestResult.words.map(word => {
-                            word.text = fixOCRText(word.text);
-                            return word;
-                        });
-                    }
-                }
-                
-                return bestResult;
-                
+                return result.data.text;
             } catch (error) {
                 console.error('OCR error:', error);
-                return null;
+                return '';
             }
         }
         
-        function fixOCRText(text) {
-            if (!text) return text;
-            
-            let fixed = text;
-            
-            // Fix serial number patterns (like 5CD4345W4V)
-            fixed = fixed.replace(/([A-Z0-9]{6,})/g, (match) => {
-                let serial = match;
-                
-                // Fix common letter/number confusions in serial numbers
-                serial = serial.replace(/[wW]/g, 'W');
-                serial = serial.replace(/[aA]/g, 'A');
-                serial = serial.replace(/[vV]/g, 'V');
-                
-                return serial;
-            });
-            
-            // Fix MAC addresses
-            fixed = fixed.replace(/([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}/g, (mac) => {
-                return mac.toUpperCase();
-            });
-            
-            return fixed;
-        }
-        
-        function showSelectionScreen(canvas, ocrData) {
-            imageWidth = canvas.width;
-            imageHeight = canvas.height;
-            
-            // Store full text for fallback
-            window.ocrFullText = ocrData ? ocrData.text : '';
-            
+        function showResults(ocrText) {
             document.getElementById('app').style.display = 'none';
-            document.getElementById('selectionScreen').style.display = 'flex';
+            document.getElementById('resultsScreen').style.display = 'flex';
             
-            const img = document.getElementById('processedImage');
-            img.src = canvas.toDataURL();
+            // Clear previous content
+            document.getElementById('detectedItems').innerHTML = '';
+            document.getElementById('allTextLines').innerHTML = '';
             
-            // Wait for image to load before positioning boxes
-            img.onload = () => {
-                document.getElementById('textOverlay').innerHTML = '';
-                
-                if (ocrData && ocrData.words && ocrData.words.length > 0) {
-                    createTextBoxes(ocrData.words);
-                } else {
-                    // Fallback to text-based boxes
-                    createFallbackTextBoxes(document.getElementById('textOverlay'));
-                }
+            // Auto-detect serial numbers and MAC addresses
+            const detected = autoDetect(ocrText);
+            
+            // Display auto-detected items
+            const detectedHTML = [];
+            
+            if (detected.serialNumbers.length > 0) {
+                detectedHTML.push('<h3>🔢 Serial Numbers</h3>');
+                detected.serialNumbers.forEach(serial => {
+                    detectedHTML.push(`
+                        <div class="detected-item" onclick="selectText('${serial}', this)">
+                            <div>
+                                <div class="label">Serial Number</div>
+                                <div class="value">${serial}</div>
+                            </div>
+                            <span>→</span>
+                        </div>
+                    `);
+                });
+            }
+            
+            if (detected.macAddresses.length > 0) {
+                detectedHTML.push('<h3>🌐 MAC Addresses</h3>');
+                detected.macAddresses.forEach(mac => {
+                    detectedHTML.push(`
+                        <div class="detected-item" onclick="selectText('${mac}', this)">
+                            <div>
+                                <div class="label">MAC Address</div>
+                                <div class="value">${mac}</div>
+                            </div>
+                            <span>→</span>
+                        </div>
+                    `);
+                });
+            }
+            
+            if (detectedHTML.length === 0) {
+                detectedHTML.push('<p style="color:#666; text-align:center;">No serial numbers or MAC addresses detected automatically</p>');
+            }
+            
+            document.getElementById('detectedItems').innerHTML = detectedHTML.join('');
+            
+            // Display all text lines as fallback
+            const lines = ocrText.split('\n').filter(line => line.trim().length > 0);
+            lines.forEach(line => {
+                const div = document.createElement('div');
+                div.className = 'text-line';
+                div.textContent = line.trim();
+                div.onclick = () => selectText(line.trim(), div);
+                document.getElementById('allTextLines').appendChild(div);
+            });
+        }
+        
+        function autoDetect(text) {
+            const results = {
+                serialNumbers: [],
+                macAddresses: []
             };
-        }
-        
-        function createTextBoxes(words) {
-            const overlay = document.getElementById('textOverlay');
-            overlay.innerHTML = ''; // Clear existing boxes
             
-            console.log('Creating boxes from words:', words);
+            // Detect serial numbers (7+ alphanumeric characters)
+            const serialPatterns = [
+                /(?:serial|s\/n|service tag)[:\s]*([A-Z0-9]{7,})/gi,
+                /\b([A-Z0-9]{7,})\b/g
+            ];
             
-            // DON'T filter by confidence - show ALL words
-            const allWords = words;
-            
-            console.log('Total words to display:', allWords.length);
-            
-            // Group words into lines
-            const lines = groupWordsIntoLines(allWords);
-            
-            console.log('Lines found:', lines.length);
-            
-            // If no lines found, try a different approach
-            if (lines.length === 0) {
-                createFallbackTextBoxes(overlay);
-                return;
-            }
-            
-            lines.forEach((line, index) => {
-                // Show ALL text, even short lines
-                if (line.text.trim().length < 1) return;
-                
-                const box = document.createElement('div');
-                box.className = 'text-box';
-                
-                // Convert pixel coordinates to percentages
-                const leftPercent = (line.x / imageWidth) * 100;
-                const topPercent = (line.y / imageHeight) * 100;
-                const widthPercent = Math.max((line.width / imageWidth) * 100, 2); // Minimum 2% width
-                const heightPercent = Math.max((line.height / imageHeight) * 100, 1.5); // Minimum 1.5% height
-                
-                box.style.left = leftPercent + '%';
-                box.style.top = topPercent + '%';
-                box.style.width = widthPercent + '%';
-                box.style.height = heightPercent + '%';
-                box.style.minHeight = '15px';
-                
-                // Store text
-                box.dataset.text = line.text;
-                
-                // Add title attribute for debugging
-                box.title = line.text;
-                
-                box.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    selectText(line.text, box);
-                });
-                
-                overlay.appendChild(box);
-                
-                console.log(`Box ${index}: "${line.text}" at ${leftPercent.toFixed(1)}%, ${topPercent.toFixed(1)}%, size: ${widthPercent.toFixed(1)}% x ${heightPercent.toFixed(1)}%`);
-            });
-            
-            if (lines.length === 0) {
-                showNotification('No text detected. Try closer photo.');
-            }
-        }
-        
-        // Fallback: Create boxes from raw text lines
-        function createFallbackTextBoxes(overlay) {
-            // Use the full text from OCR
-            if (window.ocrFullText) {
-                const lines = window.ocrFullText.split('\n').filter(line => line.trim().length > 0);
-                
-                console.log('Fallback lines:', lines);
-                
-                // Create evenly spaced boxes for each line
-                lines.forEach((line, index) => {
-                    const box = document.createElement('div');
-                    box.className = 'text-box';
-                    
-                    // Estimate position based on line index
-                    const topPercent = (index / lines.length) * 100;
-                    
-                    box.style.left = '5%';
-                    box.style.top = topPercent + '%';
-                    box.style.width = '90%';
-                    box.style.height = (80 / lines.length) + '%';
-                    box.style.minHeight = '20px';
-                    
-                    box.dataset.text = line.trim();
-                    box.title = line.trim();
-                    
-                    box.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        selectText(line.trim(), box);
+            serialPatterns.forEach(pattern => {
+                const matches = text.match(pattern);
+                if (matches) {
+                    matches.forEach(match => {
+                        const clean = match.replace(/(?:serial|s\/n|service tag)[:\s]*/gi, '').trim();
+                        if (clean.length >= 7 && /[A-Z]/.test(clean) && /\d/.test(clean)) {
+                            if (!results.serialNumbers.includes(clean)) {
+                                results.serialNumbers.push(clean);
+                            }
+                        }
                     });
-                    
-                    overlay.appendChild(box);
+                }
+            });
+            
+            // Detect MAC addresses
+            const macPattern = /\b([0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b/gi;
+            const macMatches = text.match(macPattern);
+            if (macMatches) {
+                macMatches.forEach(mac => {
+                    const cleanMac = mac.toUpperCase();
+                    if (!results.macAddresses.includes(cleanMac)) {
+                        results.macAddresses.push(cleanMac);
+                    }
                 });
             }
-        }
-        
-        function groupWordsIntoLines(words) {
-            const lines = [];
-            let currentLine = null;
             
-            // Sort words by vertical position, then horizontal
-            const sortedWords = words.slice().sort((a, b) => {
-                const yDiff = a.bbox.y0 - b.bbox.y0;
-                if (Math.abs(yDiff) > 10) {
-                    return yDiff;
-                }
-                return a.bbox.x0 - b.bbox.x0;
-            });
-            
-            sortedWords.forEach(word => {
-                if (!word.bbox) return; // Skip words without bounding boxes
-                
-                const y = word.bbox.y0;
-                const height = word.bbox.y1 - word.bbox.y0;
-                
-                if (!currentLine || Math.abs(y - currentLine.y) > height * 0.7) {
-                    // New line
-                    currentLine = {
-                        text: word.text,
-                        x: word.bbox.x0,
-                        y: word.bbox.y0,
-                        width: word.bbox.x1 - word.bbox.x0,
-                        height: word.bbox.y1 - word.bbox.y0
-                    };
-                    lines.push(currentLine);
-                } else {
-                    // Same line
-                    currentLine.text += ' ' + word.text;
-                    currentLine.width = word.bbox.x1 - currentLine.x;
-                    currentLine.height = Math.max(currentLine.height, word.bbox.y1 - word.bbox.y0);
-                }
-            });
-            
-            return lines;
+            return results;
         }
         
         async function selectText(text, element) {
             try {
                 const cleanText = text.trim();
-                
                 if (!cleanText) return;
                 
                 document.getElementById('selectedText').textContent = cleanText;
                 
-                document.querySelectorAll('.text-box').forEach(box => {
-                    box.classList.remove('selected');
+                // Remove previous selections
+                document.querySelectorAll('.detected-item, .text-line').forEach(el => {
+                    el.classList.remove('selected');
                 });
                 
                 if (element) {
                     element.classList.add('selected');
                 }
                 
+                // Generate QR code
                 const qrContainer = document.getElementById('qrContainer');
                 qrContainer.style.display = 'block';
                 
@@ -1081,6 +858,7 @@
                     errorCorrectionLevel: 'H'
                 });
                 
+                // Copy to clipboard
                 try {
                     await navigator.clipboard.writeText(cleanText);
                     showNotification('Copied: ' + cleanText);
@@ -1091,35 +869,30 @@
                 if (navigator.vibrate) {
                     navigator.vibrate(50);
                 }
-                
             } catch (error) {
                 console.error('Selection error:', error);
             }
         }
         
         function clearSelection() {
-            document.getElementById('selectedText').textContent = 'Tap on text in the image';
+            document.getElementById('selectedText').textContent = 'Tap on any value to select';
             document.getElementById('qrContainer').style.display = 'none';
-            document.querySelectorAll('.text-box').forEach(box => {
-                box.classList.remove('selected');
+            document.querySelectorAll('.detected-item, .text-line').forEach(el => {
+                el.classList.remove('selected');
             });
         }
         
         function retakePhoto() {
-            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('resultsScreen').style.display = 'none';
             document.getElementById('app').style.display = 'flex';
             clearSelection();
-            
-            setTimeout(() => {
-                initCamera();
-            }, 100);
+            setTimeout(() => initCamera(), 100);
         }
         
         function showNotification(message) {
             const notification = document.getElementById('notification');
             notification.textContent = message;
             notification.style.display = 'block';
-            
             setTimeout(() => {
                 notification.style.display = 'none';
             }, 2000);
