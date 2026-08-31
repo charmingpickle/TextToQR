@@ -1,437 +1,1143 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>BIOS Tap → QR (Offline AI)</title>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-
-  <style>
-    :root {
-      --bg-main: #09090b;
-      --bg-surface: #18181b;
-      --bg-card: #27272a;
-      --accent-color: #3b82f6;
-      --accent-hover: #2563eb;
-      --text-main: #f4f4f5;
-      --text-muted: #a1a1aa;
-      --border-color: #3f3f46;
-      --box-highlight: rgba(59, 130, 246, 0.35);
-      --box-border: #60a5fa;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BIOS Scanner Pro</title>
     
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg-main);
-      color: var(--text-main);
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .install-banner {
-      background: #1e3a8a;
-      border-bottom: 1px solid var(--accent-color);
-      padding: 10px 14px;
-      font-size: 0.8rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 30;
-    }
-
-    .view {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      width: 100%; height: 100dvh;
-      overflow: hidden;
-    }
-
-    .viewport {
-      flex: 1;
-      position: relative;
-      background: #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    video, #captured-image {
-      width: 100%; height: 100%;
-      object-fit: contain;
-    }
-
-    .view-finder {
-      position: absolute;
-      width: 85%; height: 55%;
-      border: 2px dashed rgba(255, 255, 255, 0.4);
-      border-radius: 16px;
-      pointer-events: none;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-      display: flex; align-items: flex-start; justify-content: center;
-      padding-top: 12px;
-    }
-
-    .view-finder::after {
-      content: "Position BIOS text inside frame";
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.8rem; font-weight: 600;
-      letter-spacing: 0.5px; text-transform: uppercase;
-      background: rgba(0, 0, 0, 0.65);
-      padding: 6px 14px; border-radius: 20px;
-    }
-
-    #overlay-container {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: auto;
-    }
-
-    .box-target {
-      position: absolute;
-      border: 1.5px solid var(--box-border);
-      background: var(--box-highlight);
-      border-radius: 4px;
-      cursor: pointer;
-      box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
-    }
-
-    .box-target:active {
-      background: rgba(59, 130, 246, 0.75);
-      border-color: #ffffff;
-    }
-
-    /* DOWNLOAD & PROCESSING OVERLAY */
-    .loader-overlay {
-      position: absolute; inset: 0;
-      background: rgba(9, 9, 11, 0.92);
-      backdrop-filter: blur(8px);
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      z-index: 20; gap: 16px; text-align: center; padding: 20px;
-    }
-
-    .progress-container { width: 100%; max-width: 260px; background: var(--border-color); height: 10px; border-radius: 5px; overflow: hidden; }
-    .progress-bar { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.15s ease; }
-
-    .control-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      padding: 24px 32px 40px;
-      display: flex; justify-content: space-between; align-items: center;
-      background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
-      z-index: 10;
-    }
-
-    .shutter-btn {
-      width: 80px; height: 80px; border-radius: 50%;
-      border: 4px solid #fff; background: transparent;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer;
-    }
-    .shutter-btn-inner { width: 62px; height: 62px; border-radius: 50%; background: #fff; }
-
-    .icon-btn {
-      width: 48px; height: 48px; border-radius: 50%;
-      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);
-      color: white; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
-    }
-
-    .view-header {
-      padding: 18px 20px; background: var(--bg-surface);
-      border-bottom: 1px solid var(--border-color);
-      text-align: center; font-weight: 600; font-size: 1.05rem;
-    }
-
-    .action-bar {
-      padding: 16px 20px 28px; background: var(--bg-surface);
-      border-top: 1px solid var(--border-color); display: flex; gap: 12px;
-    }
-
-    button.btn {
-      flex: 1; background: var(--accent-color); color: white;
-      border: none; padding: 14px 20px; border-radius: 12px;
-      font-size: 1rem; font-weight: 600; cursor: pointer;
-    }
-    button.btn-secondary { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); }
-
-    #qr-container-view {
-      flex: 1; overflow-y: auto; padding: 32px 24px;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
-    }
-
-    .qr-card { background: #ffffff; padding: 20px; border-radius: 20px; }
-
-    .text-editor-card {
-      width: 100%; max-width: 360px; background: var(--bg-surface);
-      border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px;
-      display: flex; flex-direction: column; gap: 6px;
-    }
-
-    #result-text {
-      font-family: ui-monospace, monospace; font-size: 1.15rem; color: var(--text-main);
-      outline: none; word-break: break-all; min-height: 1.5em; user-select: text;
-    }
-
-    .hidden { display: none !important; }
-  </style>
+    <!-- Required Libraries -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script src="https://docs.opencv.org/4.8.0/opencv.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #000;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        /* ============ CAMERA VIEWFINDER ============ */
+        #cameraView {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 1;
+        }
+        
+        #cameraFeed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Camera Controls Overlay */
+        #cameraControls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            padding: 20px;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5), transparent);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        /* Zoom Controls */
+        #zoomControls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(0,0,0,0.6);
+            padding: 10px 20px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .zoom-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .zoom-btn:active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(0.9);
+        }
+        
+        #zoomSlider {
+            width: 150px;
+            accent-color: #007bff;
+        }
+        
+        #zoomLevel {
+            color: white;
+            font-size: 14px;
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        /* Focus Indicator */
+        #focusIndicator {
+            position: fixed;
+            z-index: 5;
+            width: 60px;
+            height: 60px;
+            border: 2px solid #00ff00;
+            border-radius: 50%;
+            pointer-events: none;
+            display: none;
+            animation: focusPulse 0.5s ease-out;
+        }
+        
+        @keyframes focusPulse {
+            0% { transform: scale(2); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+        
+        /* Shutter Button */
+        #shutterContainer {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        
+        #shutterBtn {
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid #007bff;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+        }
+        
+        #shutterBtn:active {
+            transform: scale(0.9);
+            background: #007bff;
+        }
+        
+        #shutterBtn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #007bff;
+        }
+        
+        .side-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .side-btn:active {
+            background: rgba(255,255,255,0.4);
+        }
+        
+        /* Camera Info */
+        #cameraInfo {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* ============ PROCESSING OVERLAY ============ */
+        #processingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 20;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255,255,255,0.1);
+            border-top: 5px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #processingText {
+            color: white;
+            font-size: 18px;
+            text-align: center;
+        }
+        
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        /* ============ RESULTS SCREEN ============ */
+        #resultsScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 30;
+            background: #f5f5f5;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .results-header {
+            background: #007bff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        
+        .results-content {
+            flex: 1;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        .data-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .data-card h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .data-item {
+            padding: 12px;
+            margin: 5px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            word-break: break-all;
+        }
+        
+        .data-item:hover {
+            border-color: #007bff;
+            background: #f8f9ff;
+        }
+        
+        .data-item.selected {
+            border-color: #007bff;
+            background: #e3f2fd;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.2);
+        }
+        
+        .data-item .copy-hint {
+            font-size: 12px;
+            color: #007bff;
+            display: none;
+            margin-top: 5px;
+        }
+        
+        .data-item:hover .copy-hint {
+            display: block;
+        }
+        
+        .qr-container {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        #qrCanvas {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .button-container {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .action-btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+        }
+        
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        /* ============ NOTIFICATION ============ */
+        #notification {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            z-index: 100;
+            display: none;
+            animation: slideUp 0.3s;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translate(-50%, 100px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+        
+        /* Mobile Optimization */
+        @media (max-width: 600px) {
+            #zoomControls {
+                padding: 8px 15px;
+            }
+            
+            #shutterBtn {
+                width: 65px;
+                height: 65px;
+            }
+            
+            #shutterBtn::after {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .action-btn {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
 </head>
 <body>
-
-  <!-- PWA INSTALL BANNER -->
-  <div id="install-banner" class="install-banner">
-    <span>💡 <strong>Save App:</strong> Tap <strong>Share/Menu</strong> $\rightarrow$ <strong>"Add to Home Screen"</strong> for offline use.</span>
-    <button onclick="document.getElementById('install-banner').classList.add('hidden')" style="background:none;border:none;color:white;">✕</button>
-  </div>
-
-  <!-- CAMERA VIEW -->
-  <div id="camera-view" class="view">
-    <div class="viewport">
-      <video id="video" autoplay playsinline muted></video>
-      <div class="view-finder"></div>
-
-      <!-- INITIAL MODEL DOWNLOAD OVERLAY -->
-      <div id="download-overlay" class="loader-overlay">
-        <h3 style="font-size:1.1rem;">First-Time Model Setup</h3>
-        <p style="font-size:0.8rem; color: var(--text-muted);">Downloading vision OCR to browser storage (~14MB)...</p>
-        <div class="progress-container">
-          <div id="progress-bar" class="progress-bar"></div>
+    <!-- Camera Viewfinder -->
+    <div id="cameraView">
+        <video id="cameraFeed" autoplay playsinline></video>
+        
+        <!-- Focus Indicator -->
+        <div id="focusIndicator"></div>
+        
+        <!-- Camera Info -->
+        <div id="cameraInfo">
+            <div id="cameraLabel">Loading camera...</div>
+            <div id="cameraResolution"></div>
         </div>
-        <div id="progress-text" style="font-size: 0.8rem; font-weight: bold;">0%</div>
-      </div>
+        
+        <!-- Camera Controls -->
+        <div id="cameraControls">
+            <!-- Zoom Controls -->
+            <div id="zoomControls">
+                <button class="zoom-btn" id="zoomOut">−</button>
+                <input type="range" id="zoomSlider" min="1" max="10" value="1" step="0.1">
+                <button class="zoom-btn" id="zoomIn">+</button>
+                <span id="zoomLevel">1.0x</span>
+            </div>
+            
+            <!-- Shutter and Actions -->
+            <div id="shutterContainer">
+                <button class="side-btn" id="flashBtn" title="Flash">⚡</button>
+                <button id="shutterBtn" title="Take Photo"></button>
+                <button class="side-btn" id="switchCamera" title="Switch Camera">🔄</button>
+            </div>
+        </div>
     </div>
     
-    <div class="control-bar">
-      <button class="icon-btn" id="btn-switch">⟳</button>
-      <button class="shutter-btn" id="btn-capture" disabled>
-        <div class="shutter-btn-inner"></div>
-      </button>
-      <div style="width: 48px;"></div>
+    <!-- Processing Overlay -->
+    <div id="processingOverlay">
+        <div class="spinner"></div>
+        <div id="processingText">Processing image...</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
     </div>
-  </div>
-
-  <!-- SELECT VIEW -->
-  <div id="select-view" class="view hidden">
-    <div class="view-header" id="select-status">Tap target text to generate QR</div>
-    <div class="viewport" id="select-viewport">
-      <img id="captured-image" alt="Captured BIOS" />
-      <div id="overlay-container"></div>
-      
-      <!-- INFERENCE RUNNING OVERLAY -->
-      <div id="ocr-loader" class="loader-overlay hidden">
-        <div style="font-weight: 600;">Running Local Vision AI...</div>
-      </div>
+    
+    <!-- Results Screen -->
+    <div id="resultsScreen">
+        <div class="results-header">
+            📸 Scan Complete
+        </div>
+        <div class="results-content">
+            <div id="capturedImageContainer" style="display:none; text-align:center; margin-bottom:20px;">
+                <img id="capturedImage" style="max-width:100%; max-height:300px; border-radius:10px;">
+            </div>
+            
+            <div id="detectedData"></div>
+            
+            <div class="qr-container" id="qrContainer" style="display:none;">
+                <h3>Scan to Copy Data</h3>
+                <canvas id="qrCanvas"></canvas>
+                <p style="margin-top:10px; color:#666;">Point your phone camera at this QR code</p>
+            </div>
+            
+            <div class="button-container">
+                <button class="action-btn btn-primary" onclick="takeAnotherPhoto()">📸 Take Another</button>
+                <button class="action-btn btn-success" onclick="copyAllData()">📋 Copy All</button>
+                <button class="action-btn btn-secondary" onclick="toggleQRCode()">🔳 Toggle QR</button>
+            </div>
+        </div>
     </div>
-    <div class="action-bar">
-      <button id="btn-retake" class="btn btn-secondary">Retake Photo</button>
-    </div>
-  </div>
-
-  <!-- QR OUTPUT VIEW -->
-  <div id="qr-view" class="view hidden">
-    <div class="view-header">Generated QR Code</div>
-    <div id="qr-container-view">
-      <div class="qr-card">
-        <div id="qrcode"></div>
-      </div>
-      <div class="text-editor-card">
-        <label style="font-size: 0.75rem; color: var(--text-muted); font-weight:700;">Extracted Text (Tap to edit)</label>
-        <div id="result-text" contenteditable="true" spellcheck="false"></div>
-      </div>
-    </div>
-    <div class="action-bar">
-      <button id="btn-pick-another" class="btn btn-secondary">Select Another Line</button>
-      <button id="btn-new-photo" class="btn">New Photo</button>
-    </div>
-  </div>
-
-  <script type="module">
-    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
-
-    // Store model weights persistently in browser cache / IndexedDB
-    env.allowLocalModels = false;
-    env.useBrowserCache = true;
-
-    const video = document.getElementById('video');
-    const cameraView = document.getElementById('camera-view');
-    const selectView = document.getElementById('select-view');
-    const qrView = document.getElementById('qr-view');
-    const capturedImage = document.getElementById('captured-image');
-    const overlayContainer = document.getElementById('overlay-container');
-    const ocrLoader = document.getElementById('ocr-loader');
-    const downloadOverlay = document.getElementById('download-overlay');
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-    const btnCapture = document.getElementById('btn-capture');
-    const resultText = document.getElementById('result-text');
-    const qrcodeEl = document.getElementById('qrcode');
-    const selectStatus = document.getElementById('select-status');
-
-    let stream = null;
-    let devices = [];
-    let currentDeviceIdx = 0;
-    let ocrPipeline = null;
-
-    async function initApp() {
-      try {
-        devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
-        await startCamera({ facingMode: { ideal: 'environment' } });
-      } catch (e) {
-        alert('Camera permission required.');
-      }
-
-      // Download lightweight PP-OCR detection & recognition model (~14MB total)
-      try {
-        ocrPipeline = await pipeline('image-to-text', 'Xenova/pp-ocrv4-onnx', {
-          progress_callback: (data) => {
-            if (data.status === 'progress') {
-              const p = Math.round(data.progress || 0);
-              progressBar.style.width = `${p}%`;
-              progressText.textContent = `${p}%`;
+    
+    <!-- Notification -->
+    <div id="notification"></div>
+    
+    <script>
+        // ============ CAMERA MANAGER ============
+        class CameraManager {
+            constructor() {
+                this.video = document.getElementById('cameraFeed');
+                this.currentStream = null;
+                this.currentCamera = 'environment'; // Default to back camera
+                this.cameras = [];
+                this.currentZoom = 1;
+                this.maxZoom = 1;
+                this.flashOn = false;
+                this.supportedConstraints = {};
+                
+                this.initializeCamera();
+                this.setupEventListeners();
             }
-          }
+            
+            async initializeCamera() {
+                try {
+                    // Check what browser supports
+                    this.supportedConstraints = navigator.mediaDevices.getSupportedConstraints();
+                    
+                    // Get list of cameras
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    this.cameras = devices.filter(device => device.kind === 'videoinput');
+                    
+                    console.log('Available cameras:', this.cameras);
+                    
+                    // Start with the best camera (prefer back camera)
+                    await this.startCamera();
+                    
+                } catch (error) {
+                    console.error('Camera initialization failed:', error);
+                    this.showNotification('Camera access denied. Please enable camera permissions.');
+                }
+            }
+            
+            async startCamera() {
+                try {
+                    // Stop current stream if any
+                    if (this.currentStream) {
+                        this.currentStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    // Build constraints for best quality
+                    const constraints = {
+                        video: {
+                            deviceId: this.cameras.length > 0 ? { exact: this.cameras[0].deviceId } : undefined,
+                            facingMode: this.currentCamera,
+                            width: { ideal: 3840 }, // 4K if available
+                            height: { ideal: 2160 },
+                            aspectRatio: { ideal: 16/9 },
+                            frameRate: { ideal: 30, max: 60 }
+                        },
+                        audio: false
+                    };
+                    
+                    // Try to get high resolution stream
+                    this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.video.srcObject = this.currentStream;
+                    
+                    // Wait for video to load
+                    await new Promise(resolve => {
+                        this.video.onloadedmetadata = () => {
+                            this.video.play();
+                            resolve();
+                        };
+                    });
+                    
+                    // Get camera capabilities
+                    const track = this.currentStream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    
+                    // Update zoom capabilities
+                    if (capabilities.zoom) {
+                        this.maxZoom = capabilities.zoom.max;
+                        document.getElementById('zoomSlider').max = this.maxZoom;
+                    }
+                    
+                    // Update camera info
+                    const cameraLabel = track.label || 'Camera';
+                    document.getElementById('cameraLabel').textContent = cameraLabel;
+                    document.getElementById('cameraResolution').textContent = 
+                        `${this.video.videoWidth}x${this.video.videoHeight}`;
+                    
+                    // Try to enable torch if available
+                    if (capabilities.torch) {
+                        document.getElementById('flashBtn').style.display = 'flex';
+                    }
+                    
+                } catch (error) {
+                    console.error('Failed to start camera:', error);
+                    
+                    // Fallback to simpler constraints
+                    try {
+                        const fallbackConstraints = {
+                            video: { facingMode: this.currentCamera },
+                            audio: false
+                        };
+                        
+                        this.currentStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                        this.video.srcObject = this.currentStream;
+                        
+                    } catch (fallbackError) {
+                        console.error('Fallback camera failed:', fallbackError);
+                        this.showNotification('Unable to access camera. Please check permissions.');
+                    }
+                }
+            }
+            
+            async switchCamera() {
+                this.currentCamera = this.currentCamera === 'environment' ? 'user' : 'environment';
+                await this.startCamera();
+            }
+            
+            async setZoom(zoomLevel) {
+                try {
+                    const track = this.currentStream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    
+                    if (capabilities.zoom) {
+                        this.currentZoom = Math.min(Math.max(zoomLevel, capabilities.zoom.min || 1), capabilities.zoom.max || 1);
+                        await track.applyConstraints({
+                            advanced: [{ zoom: this.currentZoom }]
+                        });
+                        
+                        document.getElementById('zoomLevel').textContent = `${this.currentZoom.toFixed(1)}x`;
+                        document.getElementById('zoomSlider').value = this.currentZoom;
+                    } else {
+                        // Digital zoom fallback
+                        this.applyDigitalZoom(zoomLevel);
+                    }
+                } catch (error) {
+                    console.error('Zoom failed:', error);
+                    this.applyDigitalZoom(zoomLevel);
+                }
+            }
+            
+            applyDigitalZoom(zoomLevel) {
+                this.currentZoom = Math.min(Math.max(zoomLevel, 1), 5);
+                const scale = this.currentZoom;
+                
+                this.video.style.transform = `scale(${scale})`;
+                this.video.style.transformOrigin = 'center center';
+                
+                document.getElementById('zoomLevel').textContent = `${scale.toFixed(1)}x`;
+                document.getElementById('zoomSlider').value = scale;
+            }
+            
+            async toggleFlash() {
+                try {
+                    const track = this.currentStream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    
+                    if (capabilities.torch) {
+                        this.flashOn = !this.flashOn;
+                        await track.applyConstraints({
+                            advanced: [{ torch: this.flashOn }]
+                        });
+                        
+                        document.getElementById('flashBtn').style.background = 
+                            this.flashOn ? 'rgba(255,255,0,0.5)' : 'rgba(255,255,255,0.2)';
+                    } else {
+                        this.showNotification('Flash not available on this camera');
+                    }
+                } catch (error) {
+                    console.error('Flash toggle failed:', error);
+                }
+            }
+            
+            async capturePhoto() {
+                // Create canvas with video dimensions
+                const canvas = document.createElement('canvas');
+                canvas.width = this.video.videoWidth;
+                canvas.height = this.video.videoHeight;
+                
+                const ctx = canvas.getContext('2d');
+                
+                // Apply zoom if digital zoom is active
+                if (this.currentZoom > 1 && !this.hasOpticalZoom()) {
+                    const scale = this.currentZoom;
+                    const newWidth = canvas.width / scale;
+                    const newHeight = canvas.height / scale;
+                    const offsetX = (canvas.width - newWidth) / 2;
+                    const offsetY = (canvas.height - newHeight) / 2;
+                    
+                    ctx.drawImage(this.video, offsetX, offsetY, newWidth, newHeight);
+                } else {
+                    ctx.drawImage(this.video, 0, 0);
+                }
+                
+                // Return as data URL
+                return canvas.toDataURL('image/jpeg', 0.95);
+            }
+            
+            hasOpticalZoom() {
+                const track = this.currentStream?.getVideoTracks()[0];
+                const capabilities = track?.getCapabilities();
+                return capabilities?.zoom ? true : false;
+            }
+            
+            setupEventListeners() {
+                // Zoom controls
+                document.getElementById('zoomIn').addEventListener('click', () => {
+                    this.setZoom(this.currentZoom + 0.5);
+                });
+                
+                document.getElementById('zoomOut').addEventListener('click', () => {
+                    this.setZoom(this.currentZoom - 0.5);
+                });
+                
+                document.getElementById('zoomSlider').addEventListener('input', (e) => {
+                    this.setZoom(parseFloat(e.target.value));
+                });
+                
+                // Switch camera
+                document.getElementById('switchCamera').addEventListener('click', () => {
+                    this.switchCamera();
+                });
+                
+                // Flash
+                document.getElementById('flashBtn').addEventListener('click', () => {
+                    this.toggleFlash();
+                });
+                
+                // Tap to focus
+                this.video.addEventListener('click', (e) => {
+                    this.focusAtPoint(e.clientX, e.clientY);
+                });
+            }
+            
+            async focusAtPoint(x, y) {
+                // Show focus indicator
+                const indicator = document.getElementById('focusIndicator');
+                indicator.style.display = 'block';
+                indicator.style.left = `${x - 30}px`;
+                indicator.style.top = `${y - 30}px`;
+                
+                // Animate and hide
+                setTimeout(() => {
+                    indicator.style.display = 'none';
+                }, 500);
+                
+                try {
+                    const track = this.currentStream.getVideoTracks()[0];
+                    
+                    if (track.getCapabilities().focusMode) {
+                        // Some browsers support focus points
+                        const normalizedX = x / window.innerWidth;
+                        const normalizedY = y / window.innerHeight;
+                        
+                        await track.applyConstraints({
+                            advanced: [{
+                                focusMode: 'manual',
+                                focusDistance: 0 // Auto focus
+                            }]
+                        });
+                    }
+                } catch (error) {
+                    console.log('Manual focus not supported:', error);
+                }
+            }
+        }
+        
+        // ============ OCR PROCESSOR ============
+        class OCRProcessor {
+            static async processImage(imageData) {
+                const processingOverlay = document.getElementById('processingOverlay');
+                const processingText = document.getElementById('processingText');
+                const progressFill = document.getElementById('progressFill');
+                
+                processingOverlay.style.display = 'flex';
+                
+                try {
+                    processingText.textContent = 'Preprocessing with OpenCV...';
+                    progressFill.style.width = '30%';
+                    
+                    const processedCanvas = await OpenCVProcessor.preprocess(imageData);
+                    
+                    processingText.textContent = 'Running OCR with Tesseract...';
+                    progressFill.style.width = '60%';
+                    
+                    const results = await this.runOCR(processedCanvas);
+                    
+                    processingText.textContent = 'Extracting data...';
+                    progressFill.style.width = '90%';
+                    
+                    const extractedData = DataExtractor.extract(results.text);
+                    
+                    progressFill.style.width = '100%';
+                    
+                    setTimeout(() => {
+                        processingOverlay.style.display = 'none';
+                    }, 500);
+                    
+                    return {
+                        data: extractedData,
+                        processedCanvas: processedCanvas
+                    };
+                    
+                } catch (error) {
+                    console.error('OCR failed:', error);
+                    processingOverlay.style.display = 'none';
+                    throw error;
+                }
+            }
+            
+            static async runOCR(canvas) {
+                // Run multiple OCR passes with different settings
+                const configs = [
+                    {
+                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
+                        tessedit_pageseg_mode: '6',
+                        preserve_interword_spaces: '1',
+                        tessedit_ocr_engine_mode: '2'
+                    },
+                    {
+                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:-. ',
+                        tessedit_pageseg_mode: '11',
+                        preserve_interword_spaces: '0',
+                        tessedit_ocr_engine_mode: '2'
+                    }
+                ];
+                
+                let bestResult = { text: '', confidence: 0 };
+                
+                for (const config of configs) {
+                    const result = await Tesseract.recognize(canvas, 'eng', config);
+                    
+                    if (result.data.confidence > bestResult.confidence) {
+                        bestResult = {
+                            text: result.data.text,
+                            confidence: result.data.confidence
+                        };
+                    }
+                }
+                
+                return bestResult;
+            }
+        }
+        
+        // ============ OPENCV PREPROCESSOR ============
+        class OpenCVProcessor {
+            static async preprocess(imageData) {
+                // Simplified preprocessing (you can expand this)
+                const img = await this.loadImage(imageData);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // Apply basic enhancement
+                const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageDataObj.data;
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    const enhanced = gray > 140 ? 255 : 0;
+                    data[i] = data[i + 1] = data[i + 2] = enhanced;
+                }
+                
+                ctx.putImageData(imageDataObj, 0, 0);
+                return canvas;
+            }
+            
+            static loadImage(src) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = src;
+                });
+            }
+        }
+        
+        // ============ DATA EXTRACTOR ============
+        class DataExtractor {
+            static extract(text) {
+                const results = {
+                    serialNumbers: [],
+                    macAddresses: [],
+                    manufacturer: this.detectManufacturer(text),
+                    confidence: 0,
+                    rawText: text
+                };
+                
+                // Extract serial numbers
+                const serialPatterns = [
+                    /(?:Service Tag|Serial|S\/N)[:\s]*([A-Z0-9]{7,})/i,
+                    /([A-Z0-9]{7,})(?=\s|$)/gm
+                ];
+                
+                for (const pattern of serialPatterns) {
+                    const matches = text.match(pattern);
+                    if (matches) {
+                        for (const match of matches) {
+                            const clean = match.replace(/(?:Service Tag|Serial|S\/N)[:\s]*/i, '')
+                                              .replace(/[^A-Z0-9]/g, '');
+                            if (clean && clean.length >= 7 && !results.serialNumbers.includes(clean)) {
+                                results.serialNumbers.push(clean);
+                            }
+                        }
+                    }
+                }
+                
+                // Extract MAC addresses
+                const macPatterns = [
+                    /([0-9A-F]{2}[:-]){5}[0-9A-F]{2}/gi,
+                    /([0-9A-F]{4}\.){2}[0-9A-F]{4}/gi,
+                    /([0-9A-F]{2}\s){5}[0-9A-F]{2}/gi,
+                    /([0-9A-F]{12})/gi
+                ];
+                
+                for (const pattern of macPatterns) {
+                    const matches = text.match(pattern);
+                    if (matches) {
+                        for (const match of matches) {
+                            const clean = match.toUpperCase()
+                                           .replace(/\./g, ':')
+                                           .replace(/\s/g, ':');
+                            
+                            const normalized = clean.replace(/[^0-9A-F]/g, '');
+                            if (normalized.length === 12) {
+                                const formatted = normalized.match(/.{2}/g).join(':');
+                                if (!results.macAddresses.includes(formatted)) {
+                                    results.macAddresses.push(formatted);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Calculate confidence
+                if (results.serialNumbers.length > 0) results.confidence += 50;
+                if (results.macAddresses.length > 0) results.confidence += 30;
+                if (results.manufacturer) results.confidence += 20;
+                
+                return results;
+            }
+            
+            static detectManufacturer(text) {
+                if (/dell|latitude|optiplex|precision|poweredge|inspiron/i.test(text)) return 'dell';
+                if (/hp|hewlett|proliant|elitebook|probook|pavilion/i.test(text)) return 'hp';
+                if (/lenovo|thinkpad|thinkcentre|thinkstation|ideapad/i.test(text)) return 'lenovo';
+                return null;
+            }
+        }
+        
+        // ============ QR CODE GENERATOR ============
+        class QRCodeGenerator {
+            static async generate(data) {
+                const qrCanvas = document.getElementById('qrCanvas');
+                const jsonData = JSON.stringify({
+                    type: 'BIOS_DATA',
+                    serialNumbers: data.serialNumbers,
+                    macAddresses: data.macAddresses,
+                    manufacturer: data.manufacturer,
+                    timestamp: new Date().toISOString()
+                });
+                
+                await QRCode.toCanvas(qrCanvas, jsonData, {
+                    width: 250,
+                    margin: 2,
+                    errorCorrectionLevel: 'H',
+                    color: {
+                        dark: '#000000',
+                        light: '#ffffff'
+                    }
+                });
+                
+                return jsonData;
+            }
+        }
+        
+        // ============ MAIN APP ============
+        class App {
+            constructor() {
+                this.cameraManager = new CameraManager();
+                this.currentData = null;
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                // Shutter button
+                document.getElementById('shutterBtn').addEventListener('click', () => {
+                    this.captureAndProcess();
+                });
+            }
+            
+            async captureAndProcess() {
+                try {
+                    // Capture photo
+                    const imageData = await this.cameraManager.capturePhoto();
+                    
+                    // Process with OCR
+                    const result = await OCRProcessor.processImage(imageData);
+                    
+                    // Store data
+                    this.currentData = result.data;
+                    
+                    // Show results
+                    this.showResults(result);
+                    
+                } catch (error) {
+                    console.error('Capture failed:', error);
+                    this.showNotification('Failed to capture image. Please try again.');
+                }
+            }
+            
+            showResults(result) {
+                // Hide camera view
+                document.getElementById('cameraView').style.display = 'none';
+                
+                // Show results screen
+                const resultsScreen = document.getElementById('resultsScreen');
+                resultsScreen.style.display = 'flex';
+                
+                // Show captured image
+                document.getElementById('capturedImage').src = result.processedCanvas.toDataURL();
+                document.getElementById('capturedImageContainer').style.display = 'block';
+                
+                // Display detected data
+                const detectedData = document.getElementById('detectedData');
+                let html = '';
+                
+                if (result.data.manufacturer) {
+                    html += `
+                        <div class="data-card">
+                            <h3>🏢 Manufacturer</h3>
+                            <div class="data-item selected" onclick="copyText('${result.data.manufacturer}')">
+                                ${result.data.manufacturer.toUpperCase()}
+                                <div class="copy-hint">Tap to copy</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (result.data.serialNumbers.length > 0) {
+                    html += `
+                        <div class="data-card">
+                            <h3>🔢 Serial Number${result.data.serialNumbers.length > 1 ? 's' : ''}</h3>
+                            ${result.data.serialNumbers.map(serial => `
+                                <div class="data-item" onclick="copyText('${serial}')">
+                                    ${serial}
+                                    <div class="copy-hint">Tap to copy</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                if (result.data.macAddresses.length > 0) {
+                    html += `
+                        <div class="data-card">
+                            <h3>🌐 MAC Address${result.data.macAddresses.length > 1 ? 'es' : ''}</h3>
+                            ${result.data.macAddresses.map(mac => `
+                                <div class="data-item" onclick="copyText('${mac}')">
+                                    ${mac}
+                                    <div class="copy-hint">Tap to copy</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                if (!result.data.serialNumbers.length && !result.data.macAddresses.length) {
+                    html = `
+                        <div class="data-card" style="text-align:center;">
+                            <h3>😕 No Data Detected</h3>
+                            <p>Try taking another photo with better lighting or focus.</p>
+                        </div>
+                    `;
+                }
+                
+                detectedData.innerHTML = html;
+                
+                // Generate QR code automatically
+                if (result.data.serialNumbers.length > 0 || result.data.macAddresses.length > 0) {
+                    QRCodeGenerator.generate(result.data).then(() => {
+                        document.getElementById('qrContainer').style.display = 'block';
+                    });
+                }
+            }
+            
+            showNotification(message) {
+                const notification = document.getElementById('notification');
+                notification.textContent = message;
+                notification.style.display = 'block';
+                
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        // ============ GLOBAL FUNCTIONS ============
+        let app;
+        
+        window.addEventListener('DOMContentLoaded', () => {
+            app = new App();
         });
         
-        downloadOverlay.classList.add('hidden');
-        btnCapture.disabled = false;
-      } catch (err) {
-        console.error("Model initialization failed:", err);
-      }
-    }
-
-    async function startCamera(constraints) {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, ...constraints },
-        audio: false
-      });
-      video.srcObject = stream;
-    }
-
-    document.getElementById('btn-switch').onclick = () => {
-      if (devices.length < 2) return;
-      currentDeviceIdx = (currentDeviceIdx + 1) % devices.length;
-      startCamera({ deviceId: { exact: devices[currentDeviceIdx].deviceId } });
-    };
-
-    document.getElementById('btn-capture').onclick = () => {
-      if (!video.videoWidth) return;
-
-      const rawCanvas = document.createElement('canvas');
-      rawCanvas.width = video.videoWidth;
-      rawCanvas.height = video.videoHeight;
-      rawCanvas.getContext('2d').drawImage(video, 0, 0);
-
-      capturedImage.src = rawCanvas.toDataURL('image/jpeg', 0.95);
-
-      cameraView.classList.add('hidden');
-      selectView.classList.remove('hidden');
-      ocrLoader.classList.remove('hidden');
-      overlayContainer.innerHTML = '';
-      selectStatus.textContent = "Analyzing Screen...";
-
-      capturedImage.onload = () => runOCR(rawCanvas);
-    };
-
-    async function runOCR(rawCanvas) {
-      try {
-        const dataUrl = rawCanvas.toDataURL('image/png');
+        function takeAnotherPhoto() {
+            // Hide results
+            document.getElementById('resultsScreen').style.display = 'none';
+            
+            // Show camera
+            document.getElementById('cameraView').style.display = 'block';
+            
+            // Reset camera if needed
+            if (app && app.cameraManager) {
+                app.cameraManager.startCamera();
+            }
+        }
         
-        // Fast single-pass prediction (Does not lock thread or crash mobile tab)
-        const results = await ocrPipeline(dataUrl);
+        function copyAllData() {
+            if (!app || !app.currentData) return;
+            
+            const data = app.currentData;
+            const text = [
+                '=== BIOS SCAN RESULTS ===',
+                data.manufacturer ? `Manufacturer: ${data.manufacturer}` : '',
+                data.serialNumbers.length > 0 ? `Serial Numbers: ${data.serialNumbers.join(', ')}` : '',
+                data.macAddresses.length > 0 ? `MAC Addresses: ${data.macAddresses.join(', ')}` : '',
+                `Scanned at: ${new Date().toLocaleString()}`
+            ].filter(Boolean).join('\n');
+            
+            navigator.clipboard.writeText(text).then(() => {
+                app.showNotification('All data copied to clipboard!');
+            });
+        }
         
-        selectStatus.textContent = "Tap desired text line to convert";
-        renderLineBoxes(results || [], rawCanvas.width, rawCanvas.height);
-      } catch (err) {
-        alert('AI processing failed. Retake photo.');
-        console.error(err);
-      } finally {
-        ocrLoader.classList.add('hidden');
-      }
-    }
-
-    // Render original tap-to-select bounding boxes over recognized text lines
-    function renderLineBoxes(lines, imgWidth, imgHeight) {
-      overlayContainer.innerHTML = '';
-      
-      const rect = capturedImage.getBoundingClientRect();
-      const scaleX = rect.width / imgWidth;
-      const scaleY = rect.height / imgHeight;
-
-      // Handle both structured block returns and plain array results
-      const items = Array.isArray(lines) ? lines : [lines];
-
-      items.forEach(item => {
-        const rawText = (item.generated_text || item.text || '').trim();
-        if (rawText.length < 3) return;
-
-        // Bounding box mapping
-        const bbox = item.bbox || {
-          x0: imgWidth * 0.1,
-          y0: imgHeight * 0.4,
-          x1: imgWidth * 0.9,
-          y1: imgHeight * 0.5
-        };
-
-        const box = document.createElement('div');
-        box.className = 'box-target';
-        box.style.left = `${bbox.x0 * scaleX}px`;
-        box.style.top = `${bbox.y0 * scaleY}px`;
-        box.style.width = `${(bbox.x1 - bbox.x0) * scaleX}px`;
-        box.style.height = `${(bbox.y1 - bbox.y0) * scaleY}px`;
-
-        box.onclick = () => selectText(rawText);
-        overlayContainer.appendChild(box);
-      });
-    }
-
-    function selectText(rawText) {
-      let cleaned = rawText
-        .replace(/^(serial\s*no|serial\s*number|sn|mac\s*address|mac)[:\.\s\-=]+/i, '')
-        .trim();
-
-      selectView.classList.add('hidden');
-      qrView.classList.remove('hidden');
-      resultText.textContent = cleaned;
-      renderQRCode(cleaned);
-    }
-
-    function renderQRCode(text) {
-      qrcodeEl.innerHTML = '';
-      new QRCode(qrcodeEl, {
-        text: text || ' ',
-        width: 200,
-        height: 200,
-        colorDark: "#000000",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
-      });
-    }
-
-    resultText.oninput = () => renderQRCode(resultText.textContent);
-
-    document.getElementById('btn-retake').onclick = resetToCamera;
-    document.getElementById('btn-new-photo').onclick = resetToCamera;
-    document.getElementById('btn-pick-another').onclick = () => {
-      qrView.classList.add('hidden');
-      selectView.classList.remove('hidden');
-    };
-
-    function resetToCamera() {
-      selectView.classList.add('hidden');
-      qrView.classList.add('hidden');
-      cameraView.classList.remove('hidden');
-      overlayContainer.innerHTML = '';
-    }
-
-    window.onload = initApp;
-  </script>
+        function copyText(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                app.showNotification(`Copied: ${text}`);
+            });
+        }
+        
+        function toggleQRCode() {
+            const qrContainer = document.getElementById('qrContainer');
+            qrContainer.style.display = qrContainer.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
 </body>
 </html>
