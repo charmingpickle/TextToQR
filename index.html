@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>BIOS Scanner Pro</title>
     
     <!-- Required Libraries -->
@@ -38,27 +40,27 @@
             height: 100%;
             background: #000;
             z-index: 1;
+            display: flex;
+            flex-direction: column;
         }
         
         #cameraFeed {
+            flex: 1;
             width: 100%;
-            height: 100%;
             object-fit: cover;
         }
         
         /* Camera Controls Overlay */
         #cameraControls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            position: relative;
             z-index: 10;
             padding: 20px;
-            background: linear-gradient(to top, rgba(0,0,0,0.9), rgba(0,0,0,0.5), transparent);
+            background: rgba(0,0,0,0.8);
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 15px;
+            padding-bottom: 30px;
         }
         
         /* Zoom Controls */
@@ -66,7 +68,7 @@
             display: flex;
             align-items: center;
             gap: 15px;
-            background: rgba(0,0,0,0.6);
+            background: rgba(255,255,255,0.1);
             padding: 10px 20px;
             border-radius: 25px;
             backdrop-filter: blur(10px);
@@ -103,24 +105,6 @@
             min-width: 40px;
             text-align: center;
             font-weight: bold;
-        }
-        
-        /* Focus Indicator */
-        #focusIndicator {
-            position: fixed;
-            z-index: 5;
-            width: 60px;
-            height: 60px;
-            border: 2px solid #00ff00;
-            border-radius: 50%;
-            pointer-events: none;
-            display: none;
-            animation: focusPulse 0.5s ease-out;
-        }
-        
-        @keyframes focusPulse {
-            0% { transform: scale(2); opacity: 1; }
-            100% { transform: scale(1); opacity: 0; }
         }
         
         /* Shutter Button */
@@ -178,21 +162,7 @@
             background: rgba(255,255,255,0.4);
         }
         
-        /* Camera Info */
-        #cameraInfo {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 10;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 10px;
-            font-size: 12px;
-            backdrop-filter: blur(10px);
-        }
-        
-        /* ============ PROCESSING OVERLAY ============ */
+        /* Processing Overlay */
         #processingOverlay {
             position: fixed;
             top: 0;
@@ -228,160 +198,122 @@
             text-align: center;
         }
         
-        .progress-bar {
-            width: 200px;
-            height: 4px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: #007bff;
-            width: 0%;
-            transition: width 0.3s;
-        }
-        
-        /* ============ RESULTS SCREEN ============ */
-        #resultsScreen {
+        /* ============ SELECTION SCREEN ============ */
+        #selectionScreen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             z-index: 30;
-            background: #f5f5f5;
+            background: #1a1a1a;
             display: none;
             flex-direction: column;
-            overflow-y: auto;
+            overflow: hidden;
         }
         
-        .results-header {
-            background: #007bff;
+        .selection-header {
+            background: #2a2a2a;
             color: white;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
-            position: sticky;
-            top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             z-index: 2;
         }
         
-        .results-content {
-            flex: 1;
-            padding: 20px;
-            max-width: 600px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        
-        .data-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .data-card h3 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-        
-        .data-item {
-            padding: 12px;
-            margin: 5px 0;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-family: 'Courier New', monospace;
-            font-size: 16px;
-            word-break: break-all;
-        }
-        
-        .data-item:hover {
-            border-color: #007bff;
-            background: #f8f9ff;
-        }
-        
-        .data-item.selected {
-            border-color: #007bff;
-            background: #e3f2fd;
-            box-shadow: 0 0 0 3px rgba(0,123,255,0.2);
-        }
-        
-        .data-item .copy-hint {
-            font-size: 12px;
-            color: #007bff;
-            display: none;
-            margin-top: 5px;
-        }
-        
-        .data-item:hover .copy-hint {
-            display: block;
-        }
-        
-        .qr-container {
-            text-align: center;
-            padding: 20px;
-        }
-        
-        #qrCanvas {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .button-container {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        
-        .action-btn {
-            padding: 15px 30px;
-            border: none;
-            border-radius: 25px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-            flex: 1;
-            min-width: 150px;
-            text-align: center;
-        }
-        
-        .action-btn:active {
-            transform: scale(0.95);
-        }
-        
-        .btn-primary {
+        .header-btn {
             background: #007bff;
             color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
         }
         
-        .btn-success {
-            background: #28a745;
-            color: white;
+        .header-btn:active {
+            background: #0056b3;
         }
         
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
+        #imageContainer {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111;
+            padding: 10px;
         }
         
-        .btn-danger {
-            background: #dc3545;
-            color: white;
+        #processedImage {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            cursor: crosshair;
+            transition: all 0.2s;
         }
         
-        /* ============ NOTIFICATION ============ */
+        /* Text Selection Highlight */
+        .text-highlight {
+            position: absolute;
+            border: 2px solid #00ff00;
+            background: rgba(0, 255, 0, 0.2);
+            pointer-events: none;
+            animation: highlightPulse 1s ease-in-out infinite;
+        }
+        
+        @keyframes highlightPulse {
+            0%, 100% { box-shadow: 0 0 5px #00ff00; }
+            50% { box-shadow: 0 0 20px #00ff00; }
+        }
+        
+        /* Selected Text Display */
+        #selectedTextBar {
+            background: #2a2a2a;
+            padding: 15px;
+            border-top: 2px solid #007bff;
+            min-height: 80px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #selectedTextDisplay {
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            word-break: break-all;
+            margin-bottom: 10px;
+            min-height: 30px;
+        }
+        
+        #qrPreview {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        #qrPreview canvas {
+            width: 60px;
+            height: 60px;
+        }
+        
+        #qrPreviewText {
+            color: #333;
+            font-size: 12px;
+            word-break: break-all;
+            flex: 1;
+        }
+        
+        /* Notification */
         #notification {
             position: fixed;
             bottom: 100px;
@@ -401,7 +333,56 @@
             to { transform: translate(-50%, 0); opacity: 1; }
         }
         
-        /* Mobile Optimization */
+        /* Full Screen QR Modal */
+        #qrModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 40;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        #qrModal .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        #qrModal canvas {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 50px rgba(0,123,255,0.5);
+        }
+        
+        #qrModal h3 {
+            color: white;
+            font-size: 24px;
+        }
+        
+        #qrModal p {
+            color: #ccc;
+            font-size: 16px;
+            max-width: 300px;
+            text-align: center;
+        }
+        
+        /* Mobile Responsive */
         @media (max-width: 600px) {
             #zoomControls {
                 padding: 8px 15px;
@@ -417,8 +398,12 @@
                 height: 50px;
             }
             
-            .action-btn {
-                padding: 12px 20px;
+            .selection-header {
+                font-size: 16px;
+                padding: 10px;
+            }
+            
+            #selectedTextDisplay {
                 font-size: 14px;
             }
         }
@@ -428,15 +413,6 @@
     <!-- Camera Viewfinder -->
     <div id="cameraView">
         <video id="cameraFeed" autoplay playsinline></video>
-        
-        <!-- Focus Indicator -->
-        <div id="focusIndicator"></div>
-        
-        <!-- Camera Info -->
-        <div id="cameraInfo">
-            <div id="cameraLabel">Loading camera...</div>
-            <div id="cameraResolution"></div>
-        </div>
         
         <!-- Camera Controls -->
         <div id="cameraControls">
@@ -461,35 +437,38 @@
     <div id="processingOverlay">
         <div class="spinner"></div>
         <div id="processingText">Processing image...</div>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
+    </div>
+    
+    <!-- Text Selection Screen -->
+    <div id="selectionScreen">
+        <div class="selection-header">
+            <button class="header-btn" onclick="retakePhoto()">📸 Retake</button>
+            <span>Tap on Text to Select</span>
+            <button class="header-btn" onclick="showFullQR()" id="showQRBtn" style="display:none;">🔳 View QR</button>
+        </div>
+        
+        <div id="imageContainer">
+            <img id="processedImage" alt="Processed BIOS screen">
+        </div>
+        
+        <div id="selectedTextBar">
+            <div style="color:#aaa; font-size:12px; margin-bottom:5px;">SELECTED TEXT:</div>
+            <div id="selectedTextDisplay">Tap on text in the image above</div>
+            
+            <div id="qrPreview" style="display:none;">
+                <canvas id="qrPreviewCanvas"></canvas>
+                <div id="qrPreviewText"></div>
+            </div>
         </div>
     </div>
     
-    <!-- Results Screen -->
-    <div id="resultsScreen">
-        <div class="results-header">
-            📸 Scan Complete
-        </div>
-        <div class="results-content">
-            <div id="capturedImageContainer" style="display:none; text-align:center; margin-bottom:20px;">
-                <img id="capturedImage" style="max-width:100%; max-height:300px; border-radius:10px;">
-            </div>
-            
-            <div id="detectedData"></div>
-            
-            <div class="qr-container" id="qrContainer" style="display:none;">
-                <h3>Scan to Copy Data</h3>
-                <canvas id="qrCanvas"></canvas>
-                <p style="margin-top:10px; color:#666;">Point your phone camera at this QR code</p>
-            </div>
-            
-            <div class="button-container">
-                <button class="action-btn btn-primary" onclick="takeAnotherPhoto()">📸 Take Another</button>
-                <button class="action-btn btn-success" onclick="copyAllData()">📋 Copy All</button>
-                <button class="action-btn btn-secondary" onclick="toggleQRCode()">🔳 Toggle QR</button>
-            </div>
-        </div>
+    <!-- Full Screen QR Modal -->
+    <div id="qrModal">
+        <button class="close-btn" onclick="hideFullQR()">✕</button>
+        <h3>Scan to Copy Text</h3>
+        <canvas id="fullQRCanvas"></canvas>
+        <p id="fullQRText"></p>
+        <button class="header-btn" onclick="copySelectedText()">📋 Copy Text</button>
     </div>
     
     <!-- Notification -->
@@ -501,12 +480,10 @@
             constructor() {
                 this.video = document.getElementById('cameraFeed');
                 this.currentStream = null;
-                this.currentCamera = 'environment'; // Default to back camera
-                this.cameras = [];
+                this.currentCamera = 'environment';
                 this.currentZoom = 1;
                 this.maxZoom = 1;
                 this.flashOn = false;
-                this.supportedConstraints = {};
                 
                 this.initializeCamera();
                 this.setupEventListeners();
@@ -514,16 +491,11 @@
             
             async initializeCamera() {
                 try {
-                    // Check what browser supports
-                    this.supportedConstraints = navigator.mediaDevices.getSupportedConstraints();
-                    
-                    // Get list of cameras
                     const devices = await navigator.mediaDevices.enumerateDevices();
-                    this.cameras = devices.filter(device => device.kind === 'videoinput');
+                    const cameras = devices.filter(device => device.kind === 'videoinput');
                     
-                    console.log('Available cameras:', this.cameras);
+                    console.log('Available cameras:', cameras);
                     
-                    // Start with the best camera (prefer back camera)
                     await this.startCamera();
                     
                 } catch (error) {
@@ -534,29 +506,24 @@
             
             async startCamera() {
                 try {
-                    // Stop current stream if any
                     if (this.currentStream) {
                         this.currentStream.getTracks().forEach(track => track.stop());
                     }
                     
-                    // Build constraints for best quality
                     const constraints = {
                         video: {
-                            deviceId: this.cameras.length > 0 ? { exact: this.cameras[0].deviceId } : undefined,
                             facingMode: this.currentCamera,
-                            width: { ideal: 3840 }, // 4K if available
+                            width: { ideal: 3840 },
                             height: { ideal: 2160 },
                             aspectRatio: { ideal: 16/9 },
-                            frameRate: { ideal: 30, max: 60 }
+                            frameRate: { ideal: 30 }
                         },
                         audio: false
                     };
                     
-                    // Try to get high resolution stream
                     this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
                     this.video.srcObject = this.currentStream;
                     
-                    // Wait for video to load
                     await new Promise(resolve => {
                         this.video.onloadedmetadata = () => {
                             this.video.play();
@@ -564,43 +531,26 @@
                         };
                     });
                     
-                    // Get camera capabilities
                     const track = this.currentStream.getVideoTracks()[0];
                     const capabilities = track.getCapabilities();
                     
-                    // Update zoom capabilities
                     if (capabilities.zoom) {
-                        this.maxZoom = capabilities.zoom.max;
+                        this.maxZoom = capabilities.zoom.max || 10;
                         document.getElementById('zoomSlider').max = this.maxZoom;
-                    }
-                    
-                    // Update camera info
-                    const cameraLabel = track.label || 'Camera';
-                    document.getElementById('cameraLabel').textContent = cameraLabel;
-                    document.getElementById('cameraResolution').textContent = 
-                        `${this.video.videoWidth}x${this.video.videoHeight}`;
-                    
-                    // Try to enable torch if available
-                    if (capabilities.torch) {
-                        document.getElementById('flashBtn').style.display = 'flex';
                     }
                     
                 } catch (error) {
                     console.error('Failed to start camera:', error);
                     
-                    // Fallback to simpler constraints
+                    // Fallback
                     try {
-                        const fallbackConstraints = {
+                        this.currentStream = await navigator.mediaDevices.getUserMedia({
                             video: { facingMode: this.currentCamera },
                             audio: false
-                        };
-                        
-                        this.currentStream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                        });
                         this.video.srcObject = this.currentStream;
-                        
                     } catch (fallbackError) {
                         console.error('Fallback camera failed:', fallbackError);
-                        this.showNotification('Unable to access camera. Please check permissions.');
                     }
                 }
             }
@@ -616,32 +566,23 @@
                     const capabilities = track.getCapabilities();
                     
                     if (capabilities.zoom) {
-                        this.currentZoom = Math.min(Math.max(zoomLevel, capabilities.zoom.min || 1), capabilities.zoom.max || 1);
+                        this.currentZoom = Math.min(Math.max(zoomLevel, 1), capabilities.zoom.max || 10);
                         await track.applyConstraints({
                             advanced: [{ zoom: this.currentZoom }]
                         });
-                        
-                        document.getElementById('zoomLevel').textContent = `${this.currentZoom.toFixed(1)}x`;
-                        document.getElementById('zoomSlider').value = this.currentZoom;
                     } else {
-                        // Digital zoom fallback
-                        this.applyDigitalZoom(zoomLevel);
+                        // Digital zoom
+                        this.currentZoom = Math.min(Math.max(zoomLevel, 1), 5);
+                        this.video.style.transform = `scale(${this.currentZoom})`;
+                        this.video.style.transformOrigin = 'center center';
                     }
+                    
+                    document.getElementById('zoomLevel').textContent = `${this.currentZoom.toFixed(1)}x`;
+                    document.getElementById('zoomSlider').value = this.currentZoom;
+                    
                 } catch (error) {
                     console.error('Zoom failed:', error);
-                    this.applyDigitalZoom(zoomLevel);
                 }
-            }
-            
-            applyDigitalZoom(zoomLevel) {
-                this.currentZoom = Math.min(Math.max(zoomLevel, 1), 5);
-                const scale = this.currentZoom;
-                
-                this.video.style.transform = `scale(${scale})`;
-                this.video.style.transformOrigin = 'center center';
-                
-                document.getElementById('zoomLevel').textContent = `${scale.toFixed(1)}x`;
-                document.getElementById('zoomSlider').value = scale;
             }
             
             async toggleFlash() {
@@ -658,7 +599,7 @@
                         document.getElementById('flashBtn').style.background = 
                             this.flashOn ? 'rgba(255,255,0,0.5)' : 'rgba(255,255,255,0.2)';
                     } else {
-                        this.showNotification('Flash not available on this camera');
+                        this.showNotification('Flash not available');
                     }
                 } catch (error) {
                     console.error('Flash toggle failed:', error);
@@ -666,15 +607,14 @@
             }
             
             async capturePhoto() {
-                // Create canvas with video dimensions
                 const canvas = document.createElement('canvas');
                 canvas.width = this.video.videoWidth;
                 canvas.height = this.video.videoHeight;
                 
                 const ctx = canvas.getContext('2d');
                 
-                // Apply zoom if digital zoom is active
-                if (this.currentZoom > 1 && !this.hasOpticalZoom()) {
+                // Apply zoom
+                if (this.currentZoom > 1) {
                     const scale = this.currentZoom;
                     const newWidth = canvas.width / scale;
                     const newHeight = canvas.height / scale;
@@ -686,18 +626,10 @@
                     ctx.drawImage(this.video, 0, 0);
                 }
                 
-                // Return as data URL
                 return canvas.toDataURL('image/jpeg', 0.95);
             }
             
-            hasOpticalZoom() {
-                const track = this.currentStream?.getVideoTracks()[0];
-                const capabilities = track?.getCapabilities();
-                return capabilities?.zoom ? true : false;
-            }
-            
             setupEventListeners() {
-                // Zoom controls
                 document.getElementById('zoomIn').addEventListener('click', () => {
                     this.setZoom(this.currentZoom + 0.5);
                 });
@@ -710,374 +642,13 @@
                     this.setZoom(parseFloat(e.target.value));
                 });
                 
-                // Switch camera
                 document.getElementById('switchCamera').addEventListener('click', () => {
                     this.switchCamera();
                 });
                 
-                // Flash
                 document.getElementById('flashBtn').addEventListener('click', () => {
                     this.toggleFlash();
                 });
-                
-                // Tap to focus
-                this.video.addEventListener('click', (e) => {
-                    this.focusAtPoint(e.clientX, e.clientY);
-                });
-            }
-            
-            async focusAtPoint(x, y) {
-                // Show focus indicator
-                const indicator = document.getElementById('focusIndicator');
-                indicator.style.display = 'block';
-                indicator.style.left = `${x - 30}px`;
-                indicator.style.top = `${y - 30}px`;
-                
-                // Animate and hide
-                setTimeout(() => {
-                    indicator.style.display = 'none';
-                }, 500);
-                
-                try {
-                    const track = this.currentStream.getVideoTracks()[0];
-                    
-                    if (track.getCapabilities().focusMode) {
-                        // Some browsers support focus points
-                        const normalizedX = x / window.innerWidth;
-                        const normalizedY = y / window.innerHeight;
-                        
-                        await track.applyConstraints({
-                            advanced: [{
-                                focusMode: 'manual',
-                                focusDistance: 0 // Auto focus
-                            }]
-                        });
-                    }
-                } catch (error) {
-                    console.log('Manual focus not supported:', error);
-                }
-            }
-        }
-        
-        // ============ OCR PROCESSOR ============
-        class OCRProcessor {
-            static async processImage(imageData) {
-                const processingOverlay = document.getElementById('processingOverlay');
-                const processingText = document.getElementById('processingText');
-                const progressFill = document.getElementById('progressFill');
-                
-                processingOverlay.style.display = 'flex';
-                
-                try {
-                    processingText.textContent = 'Preprocessing with OpenCV...';
-                    progressFill.style.width = '30%';
-                    
-                    const processedCanvas = await OpenCVProcessor.preprocess(imageData);
-                    
-                    processingText.textContent = 'Running OCR with Tesseract...';
-                    progressFill.style.width = '60%';
-                    
-                    const results = await this.runOCR(processedCanvas);
-                    
-                    processingText.textContent = 'Extracting data...';
-                    progressFill.style.width = '90%';
-                    
-                    const extractedData = DataExtractor.extract(results.text);
-                    
-                    progressFill.style.width = '100%';
-                    
-                    setTimeout(() => {
-                        processingOverlay.style.display = 'none';
-                    }, 500);
-                    
-                    return {
-                        data: extractedData,
-                        processedCanvas: processedCanvas
-                    };
-                    
-                } catch (error) {
-                    console.error('OCR failed:', error);
-                    processingOverlay.style.display = 'none';
-                    throw error;
-                }
-            }
-            
-            static async runOCR(canvas) {
-                // Run multiple OCR passes with different settings
-                const configs = [
-                    {
-                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
-                        tessedit_pageseg_mode: '6',
-                        preserve_interword_spaces: '1',
-                        tessedit_ocr_engine_mode: '2'
-                    },
-                    {
-                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:-. ',
-                        tessedit_pageseg_mode: '11',
-                        preserve_interword_spaces: '0',
-                        tessedit_ocr_engine_mode: '2'
-                    }
-                ];
-                
-                let bestResult = { text: '', confidence: 0 };
-                
-                for (const config of configs) {
-                    const result = await Tesseract.recognize(canvas, 'eng', config);
-                    
-                    if (result.data.confidence > bestResult.confidence) {
-                        bestResult = {
-                            text: result.data.text,
-                            confidence: result.data.confidence
-                        };
-                    }
-                }
-                
-                return bestResult;
-            }
-        }
-        
-        // ============ OPENCV PREPROCESSOR ============
-        class OpenCVProcessor {
-            static async preprocess(imageData) {
-                // Simplified preprocessing (you can expand this)
-                const img = await this.loadImage(imageData);
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                // Apply basic enhancement
-                const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageDataObj.data;
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                    const enhanced = gray > 140 ? 255 : 0;
-                    data[i] = data[i + 1] = data[i + 2] = enhanced;
-                }
-                
-                ctx.putImageData(imageDataObj, 0, 0);
-                return canvas;
-            }
-            
-            static loadImage(src) {
-                return new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.onload = () => resolve(img);
-                    img.onerror = reject;
-                    img.src = src;
-                });
-            }
-        }
-        
-        // ============ DATA EXTRACTOR ============
-        class DataExtractor {
-            static extract(text) {
-                const results = {
-                    serialNumbers: [],
-                    macAddresses: [],
-                    manufacturer: this.detectManufacturer(text),
-                    confidence: 0,
-                    rawText: text
-                };
-                
-                // Extract serial numbers
-                const serialPatterns = [
-                    /(?:Service Tag|Serial|S\/N)[:\s]*([A-Z0-9]{7,})/i,
-                    /([A-Z0-9]{7,})(?=\s|$)/gm
-                ];
-                
-                for (const pattern of serialPatterns) {
-                    const matches = text.match(pattern);
-                    if (matches) {
-                        for (const match of matches) {
-                            const clean = match.replace(/(?:Service Tag|Serial|S\/N)[:\s]*/i, '')
-                                              .replace(/[^A-Z0-9]/g, '');
-                            if (clean && clean.length >= 7 && !results.serialNumbers.includes(clean)) {
-                                results.serialNumbers.push(clean);
-                            }
-                        }
-                    }
-                }
-                
-                // Extract MAC addresses
-                const macPatterns = [
-                    /([0-9A-F]{2}[:-]){5}[0-9A-F]{2}/gi,
-                    /([0-9A-F]{4}\.){2}[0-9A-F]{4}/gi,
-                    /([0-9A-F]{2}\s){5}[0-9A-F]{2}/gi,
-                    /([0-9A-F]{12})/gi
-                ];
-                
-                for (const pattern of macPatterns) {
-                    const matches = text.match(pattern);
-                    if (matches) {
-                        for (const match of matches) {
-                            const clean = match.toUpperCase()
-                                           .replace(/\./g, ':')
-                                           .replace(/\s/g, ':');
-                            
-                            const normalized = clean.replace(/[^0-9A-F]/g, '');
-                            if (normalized.length === 12) {
-                                const formatted = normalized.match(/.{2}/g).join(':');
-                                if (!results.macAddresses.includes(formatted)) {
-                                    results.macAddresses.push(formatted);
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Calculate confidence
-                if (results.serialNumbers.length > 0) results.confidence += 50;
-                if (results.macAddresses.length > 0) results.confidence += 30;
-                if (results.manufacturer) results.confidence += 20;
-                
-                return results;
-            }
-            
-            static detectManufacturer(text) {
-                if (/dell|latitude|optiplex|precision|poweredge|inspiron/i.test(text)) return 'dell';
-                if (/hp|hewlett|proliant|elitebook|probook|pavilion/i.test(text)) return 'hp';
-                if (/lenovo|thinkpad|thinkcentre|thinkstation|ideapad/i.test(text)) return 'lenovo';
-                return null;
-            }
-        }
-        
-        // ============ QR CODE GENERATOR ============
-        class QRCodeGenerator {
-            static async generate(data) {
-                const qrCanvas = document.getElementById('qrCanvas');
-                const jsonData = JSON.stringify({
-                    type: 'BIOS_DATA',
-                    serialNumbers: data.serialNumbers,
-                    macAddresses: data.macAddresses,
-                    manufacturer: data.manufacturer,
-                    timestamp: new Date().toISOString()
-                });
-                
-                await QRCode.toCanvas(qrCanvas, jsonData, {
-                    width: 250,
-                    margin: 2,
-                    errorCorrectionLevel: 'H',
-                    color: {
-                        dark: '#000000',
-                        light: '#ffffff'
-                    }
-                });
-                
-                return jsonData;
-            }
-        }
-        
-        // ============ MAIN APP ============
-        class App {
-            constructor() {
-                this.cameraManager = new CameraManager();
-                this.currentData = null;
-                this.setupEventListeners();
-            }
-            
-            setupEventListeners() {
-                // Shutter button
-                document.getElementById('shutterBtn').addEventListener('click', () => {
-                    this.captureAndProcess();
-                });
-            }
-            
-            async captureAndProcess() {
-                try {
-                    // Capture photo
-                    const imageData = await this.cameraManager.capturePhoto();
-                    
-                    // Process with OCR
-                    const result = await OCRProcessor.processImage(imageData);
-                    
-                    // Store data
-                    this.currentData = result.data;
-                    
-                    // Show results
-                    this.showResults(result);
-                    
-                } catch (error) {
-                    console.error('Capture failed:', error);
-                    this.showNotification('Failed to capture image. Please try again.');
-                }
-            }
-            
-            showResults(result) {
-                // Hide camera view
-                document.getElementById('cameraView').style.display = 'none';
-                
-                // Show results screen
-                const resultsScreen = document.getElementById('resultsScreen');
-                resultsScreen.style.display = 'flex';
-                
-                // Show captured image
-                document.getElementById('capturedImage').src = result.processedCanvas.toDataURL();
-                document.getElementById('capturedImageContainer').style.display = 'block';
-                
-                // Display detected data
-                const detectedData = document.getElementById('detectedData');
-                let html = '';
-                
-                if (result.data.manufacturer) {
-                    html += `
-                        <div class="data-card">
-                            <h3>🏢 Manufacturer</h3>
-                            <div class="data-item selected" onclick="copyText('${result.data.manufacturer}')">
-                                ${result.data.manufacturer.toUpperCase()}
-                                <div class="copy-hint">Tap to copy</div>
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                if (result.data.serialNumbers.length > 0) {
-                    html += `
-                        <div class="data-card">
-                            <h3>🔢 Serial Number${result.data.serialNumbers.length > 1 ? 's' : ''}</h3>
-                            ${result.data.serialNumbers.map(serial => `
-                                <div class="data-item" onclick="copyText('${serial}')">
-                                    ${serial}
-                                    <div class="copy-hint">Tap to copy</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                }
-                
-                if (result.data.macAddresses.length > 0) {
-                    html += `
-                        <div class="data-card">
-                            <h3>🌐 MAC Address${result.data.macAddresses.length > 1 ? 'es' : ''}</h3>
-                            ${result.data.macAddresses.map(mac => `
-                                <div class="data-item" onclick="copyText('${mac}')">
-                                    ${mac}
-                                    <div class="copy-hint">Tap to copy</div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                }
-                
-                if (!result.data.serialNumbers.length && !result.data.macAddresses.length) {
-                    html = `
-                        <div class="data-card" style="text-align:center;">
-                            <h3>😕 No Data Detected</h3>
-                            <p>Try taking another photo with better lighting or focus.</p>
-                        </div>
-                    `;
-                }
-                
-                detectedData.innerHTML = html;
-                
-                // Generate QR code automatically
-                if (result.data.serialNumbers.length > 0 || result.data.macAddresses.length > 0) {
-                    QRCodeGenerator.generate(result.data).then(() => {
-                        document.getElementById('qrContainer').style.display = 'block';
-                    });
-                }
             }
             
             showNotification(message) {
@@ -1091,6 +662,324 @@
             }
         }
         
+        // ============ IMAGE PROCESSOR ============
+        class ImageProcessor {
+            static async preprocess(imageData) {
+                const img = await this.loadImage(imageData);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // Get image data
+                const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageDataObj.data;
+                
+                // Convert to grayscale with adaptive thresholding
+                const threshold = this.calculateThreshold(data);
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                    const binary = gray > threshold ? 255 : 0;
+                    data[i] = data[i + 1] = data[i + 2] = binary;
+                }
+                
+                ctx.putImageData(imageDataObj, 0, 0);
+                
+                // Upscale 2x for better text visibility
+                const scale = 2;
+                const upscaledCanvas = document.createElement('canvas');
+                upscaledCanvas.width = canvas.width * scale;
+                upscaledCanvas.height = canvas.height * scale;
+                const upscaledCtx = upscaledCanvas.getContext('2d');
+                upscaledCtx.imageSmoothingEnabled = true;
+                upscaledCtx.imageSmoothingQuality = 'high';
+                upscaledCtx.drawImage(canvas, 0, 0, upscaledCanvas.width, upscaledCanvas.height);
+                
+                return upscaledCanvas;
+            }
+            
+            static calculateThreshold(data) {
+                // Simple Otsu's method
+                const histogram = new Array(256).fill(0);
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                    histogram[gray]++;
+                }
+                
+                const total = data.length / 4;
+                let sum = 0;
+                for (let i = 0; i < 256; i++) sum += i * histogram[i];
+                
+                let sumB = 0, wB = 0, wF = 0, maxVariance = 0, threshold = 127;
+                
+                for (let i = 0; i < 256; i++) {
+                    wB += histogram[i];
+                    if (wB === 0) continue;
+                    wF = total - wB;
+                    if (wF === 0) break;
+                    
+                    sumB += i * histogram[i];
+                    const mB = sumB / wB;
+                    const mF = (sum - sumB) / wF;
+                    const variance = wB * wF * (mB - mF) * (mB - mF);
+                    
+                    if (variance > maxVariance) {
+                        maxVariance = variance;
+                        threshold = i;
+                    }
+                }
+                
+                return threshold;
+            }
+            
+            static loadImage(src) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = src;
+                });
+            }
+        }
+        
+        // ============ OCR MANAGER ============
+        class OCRManager {
+            static async recognizeText(canvas) {
+                try {
+                    const result = await Tesseract.recognize(
+                        canvas,
+                        'eng',
+                        {
+                            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
+                            tessedit_pageseg_mode: '6',
+                            preserve_interword_spaces: '1',
+                            tessedit_ocr_engine_mode: '2'
+                        }
+                    );
+                    
+                    return result.data;
+                } catch (error) {
+                    console.error('OCR failed:', error);
+                    return null;
+                }
+            }
+        }
+        
+        // ============ MAIN APP ============
+        class App {
+            constructor() {
+                this.cameraManager = new CameraManager();
+                this.ocrData = null;
+                this.selectedText = '';
+                this.setupEventListeners();
+            }
+            
+            setupEventListeners() {
+                document.getElementById('shutterBtn').addEventListener('click', () => {
+                    this.captureAndProcess();
+                });
+                
+                // Image click for text selection
+                document.getElementById('processedImage').addEventListener('click', (e) => {
+                    this.handleImageClick(e);
+                });
+            }
+            
+            async captureAndProcess() {
+                try {
+                    // Show processing overlay
+                    document.getElementById('processingOverlay').style.display = 'flex';
+                    document.getElementById('processingText').textContent = 'Capturing photo...';
+                    
+                    // Capture photo
+                    const imageData = await this.cameraManager.capturePhoto();
+                    
+                    document.getElementById('processingText').textContent = 'Processing image...';
+                    
+                    // Preprocess image
+                    const processedCanvas = await ImageProcessor.preprocess(imageData);
+                    
+                    // Run OCR
+                    document.getElementById('processingText').textContent = 'Reading text...';
+                    const ocrResult = await OCRManager.recognizeText(processedCanvas);
+                    
+                    // Hide processing
+                    document.getElementById('processingOverlay').style.display = 'none';
+                    
+                    // Show selection screen
+                    this.showSelectionScreen(processedCanvas, ocrResult);
+                    
+                } catch (error) {
+                    console.error('Processing failed:', error);
+                    document.getElementById('processingOverlay').style.display = 'none';
+                    this.showNotification('Failed to process image. Please try again.');
+                }
+            }
+            
+            showSelectionScreen(canvas, ocrData) {
+                this.ocrData = ocrData;
+                
+                // Hide camera
+                document.getElementById('cameraView').style.display = 'none';
+                
+                // Show selection screen
+                document.getElementById('selectionScreen').style.display = 'flex';
+                
+                // Set processed image
+                const processedImage = document.getElementById('processedImage');
+                processedImage.src = canvas.toDataURL();
+                
+                // Reset selection
+                this.selectedText = '';
+                document.getElementById('selectedTextDisplay').textContent = 'Tap on text in the image above';
+                document.getElementById('qrPreview').style.display = 'none';
+                document.getElementById('showQRBtn').style.display = 'none';
+                
+                // Store OCR words for click detection
+                if (ocrData && ocrData.words) {
+                    this.storeWordData(ocrData.words, canvas.width, canvas.height);
+                }
+            }
+            
+            storeWordData(words, imageWidth, imageHeight) {
+                this.wordData = words.map(word => ({
+                    text: word.text,
+                    bbox: word.bbox,
+                    confidence: word.confidence
+                }));
+                
+                this.imageWidth = imageWidth;
+                this.imageHeight = imageHeight;
+            }
+            
+            handleImageClick(event) {
+                const img = document.getElementById('processedImage');
+                const rect = img.getBoundingClientRect();
+                
+                // Calculate click position relative to image
+                const clickX = (event.clientX - rect.left) / rect.width * this.imageWidth;
+                const clickY = (event.clientY - rect.top) / rect.height * this.imageHeight;
+                
+                // Find closest word
+                let closestWord = null;
+                let minDistance = 50; // Maximum distance in pixels
+                
+                if (this.wordData) {
+                    for (const word of this.wordData) {
+                        const wordCenterX = (word.bbox.x0 + word.bbox.x1) / 2;
+                        const wordCenterY = (word.bbox.y0 + word.bbox.y1) / 2;
+                        
+                        const distance = Math.sqrt(
+                            Math.pow(clickX - wordCenterX, 2) + 
+                            Math.pow(clickY - wordCenterY, 2)
+                        );
+                        
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestWord = word;
+                        }
+                    }
+                }
+                
+                if (closestWord) {
+                    this.selectWord(closestWord);
+                } else {
+                    // Fallback: Use OCR text lines
+                    this.showNotification('Tap closer to the text');
+                }
+            }
+            
+            selectWord(word) {
+                // Clean up the text
+                this.selectedText = word.text.trim();
+                
+                if (!this.selectedText) {
+                    this.showNotification('No text detected at that location');
+                    return;
+                }
+                
+                // Update display
+                document.getElementById('selectedTextDisplay').textContent = this.selectedText;
+                
+                // Generate QR code
+                this.generateQRCode(this.selectedText);
+                
+                // Show highlight on image
+                this.showHighlight(word.bbox);
+                
+                // Show QR preview
+                document.getElementById('qrPreview').style.display = 'flex';
+                document.getElementById('showQRBtn').style.display = 'block';
+                
+                // Vibrate if supported
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            }
+            
+            showHighlight(bbox) {
+                // Remove existing highlights
+                document.querySelectorAll('.text-highlight').forEach(el => el.remove());
+                
+                const img = document.getElementById('processedImage');
+                const imgRect = img.getBoundingClientRect();
+                const container = document.getElementById('imageContainer');
+                const containerRect = container.getBoundingClientRect();
+                
+                // Calculate highlight position
+                const scaleX = imgRect.width / this.imageWidth;
+                const scaleY = imgRect.height / this.imageHeight;
+                
+                const highlight = document.createElement('div');
+                highlight.className = 'text-highlight';
+                highlight.style.left = `${containerRect.left - imgRect.left + bbox.x0 * scaleX}px`;
+                highlight.style.top = `${containerRect.top - imgRect.top + bbox.y0 * scaleY}px`;
+                highlight.style.width = `${(bbox.x1 - bbox.x0) * scaleX}px`;
+                highlight.style.height = `${(bbox.y1 - bbox.y0) * scaleY}px`;
+                
+                container.appendChild(highlight);
+            }
+            
+            async generateQRCode(text) {
+                try {
+                    // Small preview QR
+                    const previewCanvas = document.getElementById('qrPreviewCanvas');
+                    await QRCode.toCanvas(previewCanvas, text, {
+                        width: 60,
+                        margin: 1,
+                        errorCorrectionLevel: 'H'
+                    });
+                    
+                    document.getElementById('qrPreviewText').textContent = text;
+                    
+                    // Large full-screen QR
+                    const fullCanvas = document.getElementById('fullQRCanvas');
+                    await QRCode.toCanvas(fullCanvas, text, {
+                        width: 300,
+                        margin: 2,
+                        errorCorrectionLevel: 'H'
+                    });
+                    
+                    document.getElementById('fullQRText').textContent = text;
+                    
+                } catch (error) {
+                    console.error('QR generation failed:', error);
+                }
+            }
+            
+            showNotification(message) {
+                const notification = document.getElementById('notification');
+                notification.textContent = message;
+                notification.style.display = 'block';
+                
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 2000);
+            }
+        }
+        
         // ============ GLOBAL FUNCTIONS ============
         let app;
         
@@ -1098,45 +987,39 @@
             app = new App();
         });
         
-        function takeAnotherPhoto() {
-            // Hide results
-            document.getElementById('resultsScreen').style.display = 'none';
+        function retakePhoto() {
+            // Hide selection screen
+            document.getElementById('selectionScreen').style.display = 'none';
             
             // Show camera
-            document.getElementById('cameraView').style.display = 'block';
+            document.getElementById('cameraView').style.display = 'flex';
             
-            // Reset camera if needed
-            if (app && app.cameraManager) {
+            // Reset selection
+            app.selectedText = '';
+            document.getElementById('selectedTextDisplay').textContent = 'Tap on text in the image above';
+            document.getElementById('qrPreview').style.display = 'none';
+            document.getElementById('showQRBtn').style.display = 'none';
+            
+            // Restart camera if needed
+            if (app.cameraManager) {
                 app.cameraManager.startCamera();
             }
         }
         
-        function copyAllData() {
-            if (!app || !app.currentData) return;
-            
-            const data = app.currentData;
-            const text = [
-                '=== BIOS SCAN RESULTS ===',
-                data.manufacturer ? `Manufacturer: ${data.manufacturer}` : '',
-                data.serialNumbers.length > 0 ? `Serial Numbers: ${data.serialNumbers.join(', ')}` : '',
-                data.macAddresses.length > 0 ? `MAC Addresses: ${data.macAddresses.join(', ')}` : '',
-                `Scanned at: ${new Date().toLocaleString()}`
-            ].filter(Boolean).join('\n');
-            
-            navigator.clipboard.writeText(text).then(() => {
-                app.showNotification('All data copied to clipboard!');
-            });
+        function showFullQR() {
+            document.getElementById('qrModal').style.display = 'flex';
         }
         
-        function copyText(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                app.showNotification(`Copied: ${text}`);
-            });
+        function hideFullQR() {
+            document.getElementById('qrModal').style.display = 'none';
         }
         
-        function toggleQRCode() {
-            const qrContainer = document.getElementById('qrContainer');
-            qrContainer.style.display = qrContainer.style.display === 'none' ? 'block' : 'none';
+        function copySelectedText() {
+            if (app && app.selectedText) {
+                navigator.clipboard.writeText(app.selectedText).then(() => {
+                    app.showNotification('Copied to clipboard!');
+                });
+            }
         }
     </script>
 </body>
