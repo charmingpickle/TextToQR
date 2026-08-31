@@ -121,8 +121,9 @@
       border-radius: 12px;
       display: inline-block;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      min-height: 260px;
+      min-width: 260px;
     }
-    #qrcode canvas { display: block; }
     .status {
       font-size: 0.95rem;
       color: #555;
@@ -190,7 +191,6 @@
 
     async function getCameras() {
       try {
-        // Need temporary permission to get labels
         const temp = await navigator.mediaDevices.getUserMedia({ video: true });
         temp.getTracks().forEach(t => t.stop());
 
@@ -210,7 +210,6 @@
           cameraSelect.appendChild(opt);
         });
 
-        // Prefer back camera if available
         const back = devices.find(d => /back|rear|environment/i.test(d.label));
         if (back) cameraSelect.value = back.deviceId;
 
@@ -240,10 +239,7 @@
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
         currentTrack = stream.getVideoTracks()[0];
-
-        // Try continuous autofocus
         applyFocus();
-
         statusEl.textContent = 'Point at text and tap Capture';
       } catch (err) {
         statusEl.textContent = 'Could not start camera: ' + err.message;
@@ -255,18 +251,14 @@
       if (!currentTrack) return;
       try {
         const caps = currentTrack.getCapabilities?.();
-        if (caps && caps.focusMode && caps.focusMode.includes('continuous')) {
-          await currentTrack.applyConstraints({
-            advanced: [{ focusMode: 'continuous' }]
-          });
-        } else if (caps && caps.focusMode && caps.focusMode.includes('single-shot')) {
-          await currentTrack.applyConstraints({
-            advanced: [{ focusMode: 'single-shot' }]
-          });
+        if (caps && caps.focusMode) {
+          if (caps.focusMode.includes('continuous')) {
+            await currentTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          } else if (caps.focusMode.includes('single-shot')) {
+            await currentTrack.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+          }
         }
-      } catch (e) {
-        // Focus not supported on this device – ignore
-      }
+      } catch (e) {}
     }
 
     cameraSelect.addEventListener('change', () => {
@@ -276,9 +268,7 @@
     document.getElementById('btn-refocus').onclick = () => {
       applyFocus();
       statusEl.textContent = 'Refocus requested…';
-      setTimeout(() => {
-        statusEl.textContent = 'Point at text and tap Capture';
-      }, 800);
+      setTimeout(() => statusEl.textContent = 'Point at text and tap Capture', 800);
     };
 
     document.getElementById('btn-capture').onclick = async () => {
@@ -334,22 +324,34 @@
     };
 
     function selectLine(text, el) {
+      // Highlight selected line
       document.querySelectorAll('.line').forEach(l => l.classList.remove('selected'));
       el.classList.add('selected');
 
+      // Clear previous QR
       qrcodeEl.innerHTML = '';
-      QRCode.toCanvas(document.createElement('canvas'), text, {
-        width: 260,
-        margin: 2,
-        errorCorrectionLevel: 'M'
-      }, (err, canvas) => {
-        if (err) {
-          qrcodeEl.textContent = 'Could not create QR';
-          return;
-        }
-        qrcodeEl.appendChild(canvas);
-        qrSection.classList.remove('hidden');
-      });
+      qrSection.classList.remove('hidden');
+
+      // Generate QR - more reliable method
+      try {
+        QRCode.toCanvas(qrcodeEl, text, {
+          width: 260,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          },
+          errorCorrectionLevel: 'M'
+        }, function (error) {
+          if (error) {
+            console.error(error);
+            qrcodeEl.innerHTML = '<p style="color:red;padding:20px">QR generation failed.<br>Text may be too long.</p>';
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        qrcodeEl.innerHTML = '<p style="color:red;padding:20px">QR library error</p>';
+      }
     }
 
     document.getElementById('btn-back').onclick = () => {
