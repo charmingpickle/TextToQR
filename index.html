@@ -148,6 +148,35 @@
       padding: 10px 14px;
       font-size: 0.9rem;
     }
+    #candidates {
+      padding: 4px 0 16px;
+    }
+    #candidates .cand-heading {
+      font-family: system-ui, sans-serif;
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 10px;
+    }
+    .candidate-item {
+      background: white;
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 1.05rem;
+      font-family: monospace;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      word-break: break-word;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .candidate-item .conf {
+      font-family: system-ui, sans-serif;
+      font-size: 0.75rem;
+      color: #999;
+      white-space: nowrap;
+    }
     #qr-section {
       padding: 20px;
       text-align: center;
@@ -189,12 +218,14 @@
     </div>
     <div class="crop-controls">
       <button id="btn-retake" class="secondary">Retake</button>
+      <button id="btn-scan-full" class="secondary">Scan Whole Photo</button>
       <button id="btn-ocr" disabled>Read Area</button>
     </div>
   </div>
 
   <div id="result-view" class="view hidden">
     <div id="lines">
+      <div id="candidates" class="hidden"></div>
       <div class="line" id="result-text" contenteditable="true" spellcheck="false"></div>
       <div class="hint">Tap the text above to fix any misread characters.</div>
       <div class="format-row">
@@ -208,7 +239,7 @@
     <div id="qr-section" class="hidden">
       <div id="qrcode"></div>
       <p style="margin:12px 0;font-size:0.95rem;color:#666">Scan with another device</p>
-      <button id="btn-back" class="secondary">Start Over</button>
+      <button id="btn-back" class="secondary">Scan Next Value</button>
     </div>
   </div>
 
@@ -223,6 +254,7 @@
     const cropCanvas = document.getElementById('crop-canvas');
     const ctx = cropCanvas.getContext('2d');
     const resultText = document.getElementById('result-text');
+    const candidatesEl = document.getElementById('candidates');
     const qrSection = document.getElementById('qr-section');
     const qrcodeEl = document.getElementById('qrcode');
     const btnOcr = document.getElementById('btn-ocr');
@@ -510,6 +542,7 @@
         }
 
         resultText.textContent = cleaned;
+        candidatesEl.classList.add('hidden');
         qrSection.classList.add('hidden');
 
         cropView.classList.add('hidden');
@@ -522,6 +555,91 @@
     }
 
     btnOcr.onclick = doOCR;
+
+    async function scanFullPhoto() {
+      if (!fullCanvas) return;
+      cropStatus.textContent = 'Scanning whole photo…';
+      btnOcr.disabled = true;
+
+      // Downscale huge camera photos before OCR — keeps this fast without
+      // losing meaningful accuracy (text is usually much smaller than the
+      // full sensor resolution anyway).
+      const maxDim = 2000;
+      let scale = Math.min(1, maxDim / Math.max(fullCanvas.width, fullCanvas.height));
+      const scanCanvas = document.createElement('canvas');
+      scanCanvas.width = Math.round(fullCanvas.width * scale);
+      scanCanvas.height = Math.round(fullCanvas.height * scale);
+      scanCanvas.getContext('2d').drawImage(fullCanvas, 0, 0, scanCanvas.width, scanCanvas.height);
+
+      preprocess(scanCanvas);
+
+      try {
+        if (!worker) worker = await Tesseract.createWorker('eng');
+        // Sparse-text mode: looks for text anywhere in the image in any
+        // arrangement, which fits labels with several unrelated strings on them.
+        await worker.setParameters({
+          tessedit_pageseg_mode: '11',
+          tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-:',
+          preserve_interword_spaces: '0'
+        });
+        const { data } = await worker.recognize(scanCanvas);
+
+        const seen = new Set();
+        const candidates = [];
+        const blocks = (data.lines && data.lines.length ? data.lines : data.words) || [];
+
+        for (const b of blocks) {
+          const cleaned = (b.text || '').replace(/[^0-9A-Z\-:]/g, '').trim();
+          if (cleaned.length < 2 || seen.has(cleaned)) continue;
+          seen.add(cleaned);
+          candidates.push({ text: cleaned, confidence: Math.round(b.confidence || 0) });
+        }
+
+        candidates.sort((a, b) => b.confidence - a.confidence);
+
+        if (!candidates.length) {
+          cropStatus.textContent = 'No text found in photo';
+          btnOcr.disabled = false;
+          return;
+        }
+
+        renderCandidates(candidates);
+        cropView.classList.add('hidden');
+        resultView.classList.remove('hidden');
+        cropStatus.textContent = 'Drag a tight box around the text';
+        btnOcr.disabled = true;
+      } catch (err) {
+        console.error(err);
+        cropStatus.textContent = 'Scan failed – try again';
+        btnOcr.disabled = false;
+      }
+    }
+
+    function renderCandidates(candidates) {
+      candidatesEl.innerHTML = '<div class="cand-heading">Tap the text you want:</div>';
+      candidatesEl.classList.remove('hidden');
+      qrSection.classList.add('hidden');
+      resultText.textContent = '';
+
+      candidates.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'candidate-item';
+        const span = document.createElement('span');
+        span.textContent = c.text;
+        const conf = document.createElement('span');
+        conf.className = 'conf';
+        conf.textContent = c.confidence + '%';
+        item.appendChild(span);
+        item.appendChild(conf);
+        item.onclick = () => {
+          resultText.textContent = c.text;
+          candidatesEl.classList.add('hidden');
+        };
+        candidatesEl.appendChild(item);
+      });
+    }
+
+    document.getElementById('btn-scan-full').onclick = scanFullPhoto;
 
     // Characters that never legitimately appear in a hex MAC address, mapped
     // to the digit they're most often confused with by OCR.
@@ -568,6 +686,8 @@
 
     document.getElementById('btn-back').onclick = () => {
       resultView.classList.add('hidden');
+      candidatesEl.classList.add('hidden');
+      resultText.textContent = '';
       cameraView.classList.remove('hidden');
       statusEl.textContent = 'Point at the text';
     };
