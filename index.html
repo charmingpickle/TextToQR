@@ -3,43 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>BIOS Scanner Pro</title>
+    <title>BIOS Scanner</title>
     
-    <!-- Required Libraries -->
+    <!-- Libraries -->
     <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-    <script src="https://docs.opencv.org/4.8.0/opencv.js"></script>
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: Arial, sans-serif;
             background: #000;
-            overflow: hidden;
             height: 100vh;
             width: 100vw;
+            overflow: hidden;
             touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            -webkit-user-select: none;
         }
         
-        /* ============ CAMERA VIEWFINDER ============ */
-        #cameraView {
+        /* Camera Screen */
+        #cameraScreen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #000;
-            z-index: 1;
             display: flex;
             flex-direction: column;
         }
@@ -48,141 +36,152 @@
             flex: 1;
             width: 100%;
             object-fit: cover;
+            background: #000;
         }
         
-        /* Camera Controls Overlay */
-        #cameraControls {
-            position: relative;
-            z-index: 10;
-            padding: 20px;
+        /* Simple controls at bottom */
+        #controls {
+            padding: 15px;
             background: rgba(0,0,0,0.8);
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            padding-bottom: 30px;
-        }
-        
-        /* Zoom Controls */
-        #zoomControls {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            background: rgba(255,255,255,0.1);
-            padding: 10px 20px;
-            border-radius: 25px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .zoom-btn {
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            font-size: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
             justify-content: center;
-            transition: all 0.2s;
-        }
-        
-        .zoom-btn:active {
-            background: rgba(255,255,255,0.4);
-            transform: scale(0.9);
-        }
-        
-        #zoomSlider {
-            width: 150px;
-            accent-color: #007bff;
-        }
-        
-        #zoomLevel {
-            color: white;
-            font-size: 14px;
-            min-width: 40px;
-            text-align: center;
-            font-weight: bold;
-        }
-        
-        /* Shutter Button */
-        #shutterContainer {
-            display: flex;
             align-items: center;
-            gap: 30px;
+            gap: 20px;
         }
         
         #shutterBtn {
-            width: 75px;
-            height: 75px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             background: white;
-            border: 4px solid #007bff;
+            border: 3px solid #007bff;
             cursor: pointer;
-            position: relative;
-            transition: all 0.2s;
+            font-size: 0;
         }
         
         #shutterBtn:active {
-            transform: scale(0.9);
             background: #007bff;
         }
         
-        #shutterBtn::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: white;
-            border: 2px solid #007bff;
-        }
-        
-        .side-btn {
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
+        .small-btn {
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            font-size: 24px;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 20px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(10px);
         }
         
-        .side-btn:active {
-            background: rgba(255,255,255,0.4);
-        }
-        
-        /* Processing Overlay */
-        #processingOverlay {
+        /* Selection Screen */
+        #selectionScreen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 20;
-            background: rgba(0,0,0,0.9);
+            background: #1a1a1a;
             display: none;
             flex-direction: column;
+        }
+        
+        #selectionHeader {
+            padding: 10px;
+            background: #2a2a2a;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
+        }
+        
+        #selectionHeader button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        #imageScroll {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+        }
+        
+        #processedImage {
+            width: 100%;
+            display: block;
+        }
+        
+        /* Text selection overlay */
+        .text-box {
+            position: absolute;
+            border: 2px solid #00ff00;
+            background: rgba(0, 255, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .text-box:active {
+            background: rgba(0, 255, 0, 0.4);
+        }
+        
+        .text-box.selected {
+            background: rgba(0, 255, 0, 0.5);
+            border: 3px solid #00ff00;
+        }
+        
+        /* Bottom panel */
+        #bottomPanel {
+            background: #2a2a2a;
+            padding: 10px;
+            min-height: 100px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        #selectedText {
+            color: #00ff00;
+            font-size: 16px;
+            font-family: monospace;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+        
+        #qrContainer {
+            display: none;
+            text-align: center;
+            margin-top: 5px;
+        }
+        
+        #qrContainer canvas {
+            background: white;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        
+        #processing {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
             justify-content: center;
+            align-items: center;
+            flex-direction: column;
             gap: 20px;
+            z-index: 100;
         }
         
         .spinner {
-            width: 60px;
-            height: 60px;
-            border: 5px solid rgba(255,255,255,0.1);
-            border-top: 5px solid #007bff;
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top: 4px solid #007bff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -195,832 +194,445 @@
         #processingText {
             color: white;
             font-size: 18px;
-            text-align: center;
-        }
-        
-        /* ============ SELECTION SCREEN ============ */
-        #selectionScreen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 30;
-            background: #1a1a1a;
-            display: none;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        
-        .selection-header {
-            background: #2a2a2a;
-            color: white;
-            padding: 15px;
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            z-index: 2;
-        }
-        
-        .header-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        
-        .header-btn:active {
-            background: #0056b3;
-        }
-        
-        #imageContainer {
-            flex: 1;
-            position: relative;
-            overflow: auto;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #111;
-            padding: 10px;
-        }
-        
-        #processedImage {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            cursor: crosshair;
-            transition: all 0.2s;
-        }
-        
-        /* Text Selection Highlight */
-        .text-highlight {
-            position: absolute;
-            border: 2px solid #00ff00;
-            background: rgba(0, 255, 0, 0.2);
-            pointer-events: none;
-            animation: highlightPulse 1s ease-in-out infinite;
-        }
-        
-        @keyframes highlightPulse {
-            0%, 100% { box-shadow: 0 0 5px #00ff00; }
-            50% { box-shadow: 0 0 20px #00ff00; }
-        }
-        
-        /* Selected Text Display */
-        #selectedTextBar {
-            background: #2a2a2a;
-            padding: 15px;
-            border-top: 2px solid #007bff;
-            min-height: 80px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        #selectedTextDisplay {
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            font-size: 18px;
-            word-break: break-all;
-            margin-bottom: 10px;
-            min-height: 30px;
-        }
-        
-        #qrPreview {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            background: white;
-            padding: 10px;
-            border-radius: 10px;
-        }
-        
-        #qrPreview canvas {
-            width: 60px;
-            height: 60px;
-        }
-        
-        #qrPreviewText {
-            color: #333;
-            font-size: 12px;
-            word-break: break-all;
-            flex: 1;
         }
         
         /* Notification */
         #notification {
             position: fixed;
-            bottom: 100px;
+            bottom: 120px;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0,0,0,0.8);
             color: white;
-            padding: 12px 24px;
-            border-radius: 25px;
-            z-index: 100;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1000;
             display: none;
-            animation: slideUp 0.3s;
-        }
-        
-        @keyframes slideUp {
-            from { transform: translate(-50%, 100px); opacity: 0; }
-            to { transform: translate(-50%, 0); opacity: 1; }
-        }
-        
-        /* Full Screen QR Modal */
-        #qrModal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 40;
-            background: rgba(0,0,0,0.95);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 20px;
-        }
-        
-        #qrModal .close-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            font-size: 20px;
-            cursor: pointer;
-        }
-        
-        #qrModal canvas {
-            background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 0 50px rgba(0,123,255,0.5);
-        }
-        
-        #qrModal h3 {
-            color: white;
-            font-size: 24px;
-        }
-        
-        #qrModal p {
-            color: #ccc;
-            font-size: 16px;
-            max-width: 300px;
-            text-align: center;
-        }
-        
-        /* Mobile Responsive */
-        @media (max-width: 600px) {
-            #zoomControls {
-                padding: 8px 15px;
-            }
-            
-            #shutterBtn {
-                width: 65px;
-                height: 65px;
-            }
-            
-            #shutterBtn::after {
-                width: 50px;
-                height: 50px;
-            }
-            
-            .selection-header {
-                font-size: 16px;
-                padding: 10px;
-            }
-            
-            #selectedTextDisplay {
-                font-size: 14px;
-            }
         }
     </style>
 </head>
 <body>
-    <!-- Camera Viewfinder -->
-    <div id="cameraView">
+    <!-- Camera Screen -->
+    <div id="cameraScreen">
         <video id="cameraFeed" autoplay playsinline></video>
         
-        <!-- Camera Controls -->
-        <div id="cameraControls">
-            <!-- Zoom Controls -->
-            <div id="zoomControls">
-                <button class="zoom-btn" id="zoomOut">−</button>
-                <input type="range" id="zoomSlider" min="1" max="10" value="1" step="0.1">
-                <button class="zoom-btn" id="zoomIn">+</button>
-                <span id="zoomLevel">1.0x</span>
-            </div>
-            
-            <!-- Shutter and Actions -->
-            <div id="shutterContainer">
-                <button class="side-btn" id="flashBtn" title="Flash">⚡</button>
-                <button id="shutterBtn" title="Take Photo"></button>
-                <button class="side-btn" id="switchCamera" title="Switch Camera">🔄</button>
-            </div>
+        <div id="controls">
+            <button class="small-btn" onclick="switchCamera()">🔄</button>
+            <button id="shutterBtn" onclick="takePhoto()"></button>
+            <button class="small-btn" onclick="toggleFlash()">⚡</button>
         </div>
     </div>
     
     <!-- Processing Overlay -->
-    <div id="processingOverlay">
+    <div id="processing">
         <div class="spinner"></div>
-        <div id="processingText">Processing image...</div>
+        <div id="processingText">Processing...</div>
     </div>
     
-    <!-- Text Selection Screen -->
+    <!-- Selection Screen -->
     <div id="selectionScreen">
-        <div class="selection-header">
-            <button class="header-btn" onclick="retakePhoto()">📸 Retake</button>
-            <span>Tap on Text to Select</span>
-            <button class="header-btn" onclick="showFullQR()" id="showQRBtn" style="display:none;">🔳 View QR</button>
+        <div id="selectionHeader">
+            <button onclick="retakePhoto()">📸 Retake</button>
+            <span style="color:white; font-weight:bold;">Tap Text to Select</span>
+            <button onclick="clearSelection()">Clear</button>
         </div>
         
-        <div id="imageContainer">
-            <img id="processedImage" alt="Processed BIOS screen">
+        <div id="imageScroll">
+            <img id="processedImage" alt="Processed Image">
+            <div id="textOverlay"></div>
         </div>
         
-        <div id="selectedTextBar">
-            <div style="color:#aaa; font-size:12px; margin-bottom:5px;">SELECTED TEXT:</div>
-            <div id="selectedTextDisplay">Tap on text in the image above</div>
-            
-            <div id="qrPreview" style="display:none;">
-                <canvas id="qrPreviewCanvas"></canvas>
-                <div id="qrPreviewText"></div>
+        <div id="bottomPanel">
+            <div id="selectedText">Tap on text in the image</div>
+            <div id="qrContainer">
+                <canvas id="qrCanvas"></canvas>
             </div>
         </div>
-    </div>
-    
-    <!-- Full Screen QR Modal -->
-    <div id="qrModal">
-        <button class="close-btn" onclick="hideFullQR()">✕</button>
-        <h3>Scan to Copy Text</h3>
-        <canvas id="fullQRCanvas"></canvas>
-        <p id="fullQRText"></p>
-        <button class="header-btn" onclick="copySelectedText()">📋 Copy Text</button>
     </div>
     
     <!-- Notification -->
     <div id="notification"></div>
     
     <script>
-        // ============ CAMERA MANAGER ============
-        class CameraManager {
-            constructor() {
-                this.video = document.getElementById('cameraFeed');
-                this.currentStream = null;
-                this.currentCamera = 'environment';
-                this.currentZoom = 1;
-                this.maxZoom = 1;
-                this.flashOn = false;
+        // Simple camera setup
+        let video = document.getElementById('cameraFeed');
+        let stream = null;
+        let facingMode = 'environment'; // Try back camera first
+        let flashOn = false;
+        let imageWidth = 0;
+        let imageHeight = 0;
+        let wordBoxes = [];
+        
+        // Initialize camera
+        async function initCamera() {
+            try {
+                // Stop existing stream
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
                 
-                this.initializeCamera();
-                this.setupEventListeners();
-            }
-            
-            async initializeCamera() {
+                // Try to get camera with specific constraints
+                const constraints = {
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                // Log what camera we got
+                const track = stream.getVideoTracks()[0];
+                console.log('Camera:', track.label);
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                
+                // Simple fallback
                 try {
-                    const devices = await navigator.mediaDevices.enumerateDevices();
-                    const cameras = devices.filter(device => device.kind === 'videoinput');
-                    
-                    console.log('Available cameras:', cameras);
-                    
-                    await this.startCamera();
-                    
-                } catch (error) {
-                    console.error('Camera initialization failed:', error);
-                    this.showNotification('Camera access denied. Please enable camera permissions.');
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = stream;
+                } catch (err) {
+                    showNotification('Camera access denied');
                 }
             }
-            
-            async startCamera() {
-                try {
-                    if (this.currentStream) {
-                        this.currentStream.getTracks().forEach(track => track.stop());
-                    }
-                    
-                    const constraints = {
-                        video: {
-                            facingMode: this.currentCamera,
-                            width: { ideal: 3840 },
-                            height: { ideal: 2160 },
-                            aspectRatio: { ideal: 16/9 },
-                            frameRate: { ideal: 30 }
-                        },
-                        audio: false
-                    };
-                    
-                    this.currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    this.video.srcObject = this.currentStream;
-                    
-                    await new Promise(resolve => {
-                        this.video.onloadedmetadata = () => {
-                            this.video.play();
-                            resolve();
-                        };
-                    });
-                    
-                    const track = this.currentStream.getVideoTracks()[0];
-                    const capabilities = track.getCapabilities();
-                    
-                    if (capabilities.zoom) {
-                        this.maxZoom = capabilities.zoom.max || 10;
-                        document.getElementById('zoomSlider').max = this.maxZoom;
-                    }
-                    
-                } catch (error) {
-                    console.error('Failed to start camera:', error);
-                    
-                    // Fallback
-                    try {
-                        this.currentStream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: this.currentCamera },
-                            audio: false
-                        });
-                        this.video.srcObject = this.currentStream;
-                    } catch (fallbackError) {
-                        console.error('Fallback camera failed:', fallbackError);
-                    }
-                }
-            }
-            
-            async switchCamera() {
-                this.currentCamera = this.currentCamera === 'environment' ? 'user' : 'environment';
-                await this.startCamera();
-            }
-            
-            async setZoom(zoomLevel) {
-                try {
-                    const track = this.currentStream.getVideoTracks()[0];
-                    const capabilities = track.getCapabilities();
-                    
-                    if (capabilities.zoom) {
-                        this.currentZoom = Math.min(Math.max(zoomLevel, 1), capabilities.zoom.max || 10);
-                        await track.applyConstraints({
-                            advanced: [{ zoom: this.currentZoom }]
-                        });
-                    } else {
-                        // Digital zoom
-                        this.currentZoom = Math.min(Math.max(zoomLevel, 1), 5);
-                        this.video.style.transform = `scale(${this.currentZoom})`;
-                        this.video.style.transformOrigin = 'center center';
-                    }
-                    
-                    document.getElementById('zoomLevel').textContent = `${this.currentZoom.toFixed(1)}x`;
-                    document.getElementById('zoomSlider').value = this.currentZoom;
-                    
-                } catch (error) {
-                    console.error('Zoom failed:', error);
-                }
-            }
-            
-            async toggleFlash() {
-                try {
-                    const track = this.currentStream.getVideoTracks()[0];
+        }
+        
+        // Switch camera
+        async function switchCamera() {
+            facingMode = facingMode === 'environment' ? 'user' : 'environment';
+            await initCamera();
+        }
+        
+        // Toggle flash
+        async function toggleFlash() {
+            try {
+                if (stream) {
+                    const track = stream.getVideoTracks()[0];
                     const capabilities = track.getCapabilities();
                     
                     if (capabilities.torch) {
-                        this.flashOn = !this.flashOn;
+                        flashOn = !flashOn;
                         await track.applyConstraints({
-                            advanced: [{ torch: this.flashOn }]
+                            advanced: [{ torch: flashOn }]
                         });
-                        
-                        document.getElementById('flashBtn').style.background = 
-                            this.flashOn ? 'rgba(255,255,0,0.5)' : 'rgba(255,255,255,0.2)';
+                        showNotification(flashOn ? 'Flash ON' : 'Flash OFF');
                     } else {
-                        this.showNotification('Flash not available');
-                    }
-                } catch (error) {
-                    console.error('Flash toggle failed:', error);
-                }
-            }
-            
-            async capturePhoto() {
-                const canvas = document.createElement('canvas');
-                canvas.width = this.video.videoWidth;
-                canvas.height = this.video.videoHeight;
-                
-                const ctx = canvas.getContext('2d');
-                
-                // Apply zoom
-                if (this.currentZoom > 1) {
-                    const scale = this.currentZoom;
-                    const newWidth = canvas.width / scale;
-                    const newHeight = canvas.height / scale;
-                    const offsetX = (canvas.width - newWidth) / 2;
-                    const offsetY = (canvas.height - newHeight) / 2;
-                    
-                    ctx.drawImage(this.video, offsetX, offsetY, newWidth, newHeight);
-                } else {
-                    ctx.drawImage(this.video, 0, 0);
-                }
-                
-                return canvas.toDataURL('image/jpeg', 0.95);
-            }
-            
-            setupEventListeners() {
-                document.getElementById('zoomIn').addEventListener('click', () => {
-                    this.setZoom(this.currentZoom + 0.5);
-                });
-                
-                document.getElementById('zoomOut').addEventListener('click', () => {
-                    this.setZoom(this.currentZoom - 0.5);
-                });
-                
-                document.getElementById('zoomSlider').addEventListener('input', (e) => {
-                    this.setZoom(parseFloat(e.target.value));
-                });
-                
-                document.getElementById('switchCamera').addEventListener('click', () => {
-                    this.switchCamera();
-                });
-                
-                document.getElementById('flashBtn').addEventListener('click', () => {
-                    this.toggleFlash();
-                });
-            }
-            
-            showNotification(message) {
-                const notification = document.getElementById('notification');
-                notification.textContent = message;
-                notification.style.display = 'block';
-                
-                setTimeout(() => {
-                    notification.style.display = 'none';
-                }, 3000);
-            }
-        }
-        
-        // ============ IMAGE PROCESSOR ============
-        class ImageProcessor {
-            static async preprocess(imageData) {
-                const img = await this.loadImage(imageData);
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                
-                // Get image data
-                const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imageDataObj.data;
-                
-                // Convert to grayscale with adaptive thresholding
-                const threshold = this.calculateThreshold(data);
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                    const binary = gray > threshold ? 255 : 0;
-                    data[i] = data[i + 1] = data[i + 2] = binary;
-                }
-                
-                ctx.putImageData(imageDataObj, 0, 0);
-                
-                // Upscale 2x for better text visibility
-                const scale = 2;
-                const upscaledCanvas = document.createElement('canvas');
-                upscaledCanvas.width = canvas.width * scale;
-                upscaledCanvas.height = canvas.height * scale;
-                const upscaledCtx = upscaledCanvas.getContext('2d');
-                upscaledCtx.imageSmoothingEnabled = true;
-                upscaledCtx.imageSmoothingQuality = 'high';
-                upscaledCtx.drawImage(canvas, 0, 0, upscaledCanvas.width, upscaledCanvas.height);
-                
-                return upscaledCanvas;
-            }
-            
-            static calculateThreshold(data) {
-                // Simple Otsu's method
-                const histogram = new Array(256).fill(0);
-                for (let i = 0; i < data.length; i += 4) {
-                    const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-                    histogram[gray]++;
-                }
-                
-                const total = data.length / 4;
-                let sum = 0;
-                for (let i = 0; i < 256; i++) sum += i * histogram[i];
-                
-                let sumB = 0, wB = 0, wF = 0, maxVariance = 0, threshold = 127;
-                
-                for (let i = 0; i < 256; i++) {
-                    wB += histogram[i];
-                    if (wB === 0) continue;
-                    wF = total - wB;
-                    if (wF === 0) break;
-                    
-                    sumB += i * histogram[i];
-                    const mB = sumB / wB;
-                    const mF = (sum - sumB) / wF;
-                    const variance = wB * wF * (mB - mF) * (mB - mF);
-                    
-                    if (variance > maxVariance) {
-                        maxVariance = variance;
-                        threshold = i;
+                        showNotification('No flash on this camera');
                     }
                 }
-                
-                return threshold;
-            }
-            
-            static loadImage(src) {
-                return new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.onload = () => resolve(img);
-                    img.onerror = reject;
-                    img.src = src;
-                });
+            } catch (error) {
+                console.error('Flash error:', error);
             }
         }
         
-        // ============ OCR MANAGER ============
-        class OCRManager {
-            static async recognizeText(canvas) {
-                try {
-                    const result = await Tesseract.recognize(
-                        canvas,
-                        'eng',
-                        {
-                            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
-                            tessedit_pageseg_mode: '6',
-                            preserve_interword_spaces: '1',
-                            tessedit_ocr_engine_mode: '2'
-                        }
-                    );
-                    
-                    return result.data;
-                } catch (error) {
-                    console.error('OCR failed:', error);
-                    return null;
-                }
-            }
-        }
-        
-        // ============ MAIN APP ============
-        class App {
-            constructor() {
-                this.cameraManager = new CameraManager();
-                this.ocrData = null;
-                this.selectedText = '';
-                this.setupEventListeners();
-            }
-            
-            setupEventListeners() {
-                document.getElementById('shutterBtn').addEventListener('click', () => {
-                    this.captureAndProcess();
-                });
+        // Take photo
+        async function takePhoto() {
+            try {
+                // Show processing
+                document.getElementById('processing').style.display = 'flex';
+                document.getElementById('processingText').textContent = 'Capturing...';
                 
-                // Image click for text selection
-                document.getElementById('processedImage').addEventListener('click', (e) => {
-                    this.handleImageClick(e);
-                });
-            }
-            
-            async captureAndProcess() {
-                try {
-                    // Show processing overlay
-                    document.getElementById('processingOverlay').style.display = 'flex';
-                    document.getElementById('processingText').textContent = 'Capturing photo...';
-                    
-                    // Capture photo
-                    const imageData = await this.cameraManager.capturePhoto();
-                    
-                    document.getElementById('processingText').textContent = 'Processing image...';
-                    
-                    // Preprocess image
-                    const processedCanvas = await ImageProcessor.preprocess(imageData);
-                    
-                    // Run OCR
-                    document.getElementById('processingText').textContent = 'Reading text...';
-                    const ocrResult = await OCRManager.recognizeText(processedCanvas);
-                    
-                    // Hide processing
-                    document.getElementById('processingOverlay').style.display = 'none';
-                    
-                    // Show selection screen
-                    this.showSelectionScreen(processedCanvas, ocrResult);
-                    
-                } catch (error) {
-                    console.error('Processing failed:', error);
-                    document.getElementById('processingOverlay').style.display = 'none';
-                    this.showNotification('Failed to process image. Please try again.');
-                }
-            }
-            
-            showSelectionScreen(canvas, ocrData) {
-                this.ocrData = ocrData;
+                // Create canvas from video
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
                 
-                // Hide camera
-                document.getElementById('cameraView').style.display = 'none';
+                // Process image
+                document.getElementById('processingText').textContent = 'Processing image...';
+                const processedCanvas = await processImage(canvas);
+                
+                // Run OCR
+                document.getElementById('processingText').textContent = 'Reading text...';
+                const ocrData = await runOCR(processedCanvas);
                 
                 // Show selection screen
-                document.getElementById('selectionScreen').style.display = 'flex';
+                showSelectionScreen(processedCanvas, ocrData);
                 
-                // Set processed image
-                const processedImage = document.getElementById('processedImage');
-                processedImage.src = canvas.toDataURL();
+                // Hide processing
+                document.getElementById('processing').style.display = 'none';
                 
-                // Reset selection
-                this.selectedText = '';
-                document.getElementById('selectedTextDisplay').textContent = 'Tap on text in the image above';
-                document.getElementById('qrPreview').style.display = 'none';
-                document.getElementById('showQRBtn').style.display = 'none';
+            } catch (error) {
+                console.error('Photo error:', error);
+                document.getElementById('processing').style.display = 'none';
+                showNotification('Failed to process image');
+            }
+        }
+        
+        // Process image to black and white
+        async function processImage(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Convert to grayscale
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                // Simple threshold
+                const bw = gray > 140 ? 255 : 0;
+                data[i] = bw;
+                data[i + 1] = bw;
+                data[i + 2] = bw;
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Upscale for better OCR
+            const scale = 2;
+            const upscaled = document.createElement('canvas');
+            upscaled.width = canvas.width * scale;
+            upscaled.height = canvas.height * scale;
+            const upCtx = upscaled.getContext('2d');
+            upCtx.scale(scale, scale);
+            upCtx.drawImage(canvas, 0, 0);
+            
+            return upscaled;
+        }
+        
+        // Run OCR
+        async function runOCR(canvas) {
+            try {
+                const result = await Tesseract.recognize(
+                    canvas,
+                    'eng',
+                    {
+                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
+                        tessedit_pageseg_mode: '6'
+                    }
+                );
                 
-                // Store OCR words for click detection
-                if (ocrData && ocrData.words) {
-                    this.storeWordData(ocrData.words, canvas.width, canvas.height);
+                return result.data;
+            } catch (error) {
+                console.error('OCR error:', error);
+                return null;
+            }
+        }
+        
+        // Show selection screen
+        function showSelectionScreen(canvas, ocrData) {
+            // Save dimensions
+            imageWidth = canvas.width;
+            imageHeight = canvas.height;
+            
+            // Hide camera
+            document.getElementById('cameraScreen').style.display = 'none';
+            
+            // Show selection screen
+            document.getElementById('selectionScreen').style.display = 'flex';
+            
+            // Set image
+            const img = document.getElementById('processedImage');
+            img.src = canvas.toDataURL();
+            
+            // Clear previous boxes
+            document.getElementById('textOverlay').innerHTML = '';
+            wordBoxes = [];
+            
+            // Create clickable text boxes from OCR words
+            if (ocrData && ocrData.words) {
+                createTextBoxes(ocrData.words);
+            } else if (ocrData && ocrData.text) {
+                // Fallback: show raw text
+                showRawText(ocrData.text);
+            }
+        }
+        
+        // Create clickable text boxes
+        function createTextBoxes(words) {
+            const overlay = document.getElementById('textOverlay');
+            
+            // Group words into lines
+            const lines = groupWordsIntoLines(words);
+            
+            lines.forEach((line, index) => {
+                if (line.text.trim().length < 3) return; // Skip very short lines
+                
+                const box = document.createElement('div');
+                box.className = 'text-box';
+                box.textContent = line.text;
+                box.style.position = 'absolute';
+                box.style.left = (line.x / imageWidth * 100) + '%';
+                box.style.top = (line.y / imageHeight * 100) + '%';
+                box.style.width = (line.width / imageWidth * 100) + '%';
+                box.style.height = (line.height / imageHeight * 100) + '%';
+                box.style.fontSize = '14px';
+                box.style.color = 'transparent';
+                box.style.overflow = 'hidden';
+                
+                box.addEventListener('click', () => selectText(line.text, box));
+                
+                overlay.appendChild(box);
+                wordBoxes.push({ box, text: line.text });
+            });
+            
+            if (wordBoxes.length === 0) {
+                showNotification('No text detected. Try closer photo.');
+            }
+        }
+        
+        // Group words into lines
+        function groupWordsIntoLines(words) {
+            const lines = [];
+            let currentLine = null;
+            
+            words.forEach(word => {
+                const y = word.bbox.y0;
+                const height = word.bbox.y1 - word.bbox.y0;
+                
+                if (!currentLine || Math.abs(y - currentLine.y) > height * 0.5) {
+                    // New line
+                    currentLine = {
+                        text: word.text,
+                        x: word.bbox.x0,
+                        y: word.bbox.y0,
+                        width: word.bbox.x1 - word.bbox.x0,
+                        height: word.bbox.y1 - word.bbox.y0
+                    };
+                    lines.push(currentLine);
+                } else {
+                    // Same line
+                    currentLine.text += ' ' + word.text;
+                    currentLine.width = word.bbox.x1 - currentLine.x;
+                    currentLine.height = Math.max(currentLine.height, word.bbox.y1 - word.bbox.y0);
                 }
-            }
+            });
             
-            storeWordData(words, imageWidth, imageHeight) {
-                this.wordData = words.map(word => ({
-                    text: word.text,
-                    bbox: word.bbox,
-                    confidence: word.confidence
-                }));
-                
-                this.imageWidth = imageWidth;
-                this.imageHeight = imageHeight;
-            }
+            return lines;
+        }
+        
+        // Fallback: show raw text as list
+        function showRawText(text) {
+            const overlay = document.getElementById('textOverlay');
             
-            handleImageClick(event) {
-                const img = document.getElementById('processedImage');
-                const rect = img.getBoundingClientRect();
+            const lines = text.split('\n').filter(line => line.trim().length > 0);
+            
+            lines.forEach((line, index) => {
+                if (line.trim().length < 3) return;
                 
-                // Calculate click position relative to image
-                const clickX = (event.clientX - rect.left) / rect.width * this.imageWidth;
-                const clickY = (event.clientY - rect.top) / rect.height * this.imageHeight;
+                const div = document.createElement('div');
+                div.style.padding = '10px';
+                div.style.margin = '5px';
+                div.style.background = '#333';
+                div.style.color = 'white';
+                div.style.cursor = 'pointer';
+                div.style.borderRadius = '5px';
+                div.textContent = line.trim();
                 
-                // Find closest word
-                let closestWord = null;
-                let minDistance = 50; // Maximum distance in pixels
+                div.addEventListener('click', () => selectText(line.trim(), div));
                 
-                if (this.wordData) {
-                    for (const word of this.wordData) {
-                        const wordCenterX = (word.bbox.x0 + word.bbox.x1) / 2;
-                        const wordCenterY = (word.bbox.y0 + word.bbox.y1) / 2;
-                        
-                        const distance = Math.sqrt(
-                            Math.pow(clickX - wordCenterX, 2) + 
-                            Math.pow(clickY - wordCenterY, 2)
-                        );
-                        
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestWord = word;
-                        }
+                overlay.appendChild(div);
+            });
+            
+            // Change overlay position for list mode
+            overlay.style.position = 'relative';
+            overlay.style.padding = '10px';
+        }
+        
+        // Select text
+        async function selectText(text, element) {
+            try {
+                // Clean text
+                const cleanText = text.trim();
+                
+                if (!cleanText) return;
+                
+                // Update selected text display
+                document.getElementById('selectedText').textContent = cleanText;
+                
+                // Highlight selected box
+                if (element) {
+                    document.querySelectorAll('.text-box').forEach(box => {
+                        box.classList.remove('selected');
+                    });
+                    
+                    if (element.classList) {
+                        element.classList.add('selected');
                     }
                 }
                 
-                if (closestWord) {
-                    this.selectWord(closestWord);
-                } else {
-                    // Fallback: Use OCR text lines
-                    this.showNotification('Tap closer to the text');
-                }
-            }
-            
-            selectWord(word) {
-                // Clean up the text
-                this.selectedText = word.text.trim();
-                
-                if (!this.selectedText) {
-                    this.showNotification('No text detected at that location');
-                    return;
-                }
-                
-                // Update display
-                document.getElementById('selectedTextDisplay').textContent = this.selectedText;
-                
                 // Generate QR code
-                this.generateQRCode(this.selectedText);
+                const qrContainer = document.getElementById('qrContainer');
+                qrContainer.style.display = 'block';
                 
-                // Show highlight on image
-                this.showHighlight(word.bbox);
-                
-                // Show QR preview
-                document.getElementById('qrPreview').style.display = 'flex';
-                document.getElementById('showQRBtn').style.display = 'block';
+                const qrCanvas = document.getElementById('qrCanvas');
+                await QRCode.toCanvas(qrCanvas, cleanText, {
+                    width: 100,
+                    margin: 2,
+                    errorCorrectionLevel: 'H'
+                });
                 
                 // Vibrate if supported
                 if (navigator.vibrate) {
                     navigator.vibrate(50);
                 }
-            }
-            
-            showHighlight(bbox) {
-                // Remove existing highlights
-                document.querySelectorAll('.text-highlight').forEach(el => el.remove());
                 
-                const img = document.getElementById('processedImage');
-                const imgRect = img.getBoundingClientRect();
-                const container = document.getElementById('imageContainer');
-                const containerRect = container.getBoundingClientRect();
-                
-                // Calculate highlight position
-                const scaleX = imgRect.width / this.imageWidth;
-                const scaleY = imgRect.height / this.imageHeight;
-                
-                const highlight = document.createElement('div');
-                highlight.className = 'text-highlight';
-                highlight.style.left = `${containerRect.left - imgRect.left + bbox.x0 * scaleX}px`;
-                highlight.style.top = `${containerRect.top - imgRect.top + bbox.y0 * scaleY}px`;
-                highlight.style.width = `${(bbox.x1 - bbox.x0) * scaleX}px`;
-                highlight.style.height = `${(bbox.y1 - bbox.y0) * scaleY}px`;
-                
-                container.appendChild(highlight);
-            }
-            
-            async generateQRCode(text) {
+                // Copy to clipboard automatically
                 try {
-                    // Small preview QR
-                    const previewCanvas = document.getElementById('qrPreviewCanvas');
-                    await QRCode.toCanvas(previewCanvas, text, {
-                        width: 60,
-                        margin: 1,
-                        errorCorrectionLevel: 'H'
-                    });
-                    
-                    document.getElementById('qrPreviewText').textContent = text;
-                    
-                    // Large full-screen QR
-                    const fullCanvas = document.getElementById('fullQRCanvas');
-                    await QRCode.toCanvas(fullCanvas, text, {
-                        width: 300,
-                        margin: 2,
-                        errorCorrectionLevel: 'H'
-                    });
-                    
-                    document.getElementById('fullQRText').textContent = text;
-                    
-                } catch (error) {
-                    console.error('QR generation failed:', error);
+                    await navigator.clipboard.writeText(cleanText);
+                    showNotification('Copied: ' + cleanText);
+                } catch (err) {
+                    // Clipboard might not work without HTTPS
                 }
-            }
-            
-            showNotification(message) {
-                const notification = document.getElementById('notification');
-                notification.textContent = message;
-                notification.style.display = 'block';
                 
-                setTimeout(() => {
-                    notification.style.display = 'none';
-                }, 2000);
+            } catch (error) {
+                console.error('Selection error:', error);
             }
         }
         
-        // ============ GLOBAL FUNCTIONS ============
-        let app;
+        // Clear selection
+        function clearSelection() {
+            document.getElementById('selectedText').textContent = 'Tap on text in the image';
+            document.getElementById('qrContainer').style.display = 'none';
+            document.querySelectorAll('.text-box').forEach(box => {
+                box.classList.remove('selected');
+            });
+        }
         
+        // Retake photo
+        function retakePhoto() {
+            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('cameraScreen').style.display = 'flex';
+            clearSelection();
+            
+            // Restart camera
+            setTimeout(() => {
+                initCamera();
+            }, 100);
+        }
+        
+        // Show notification
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 2000);
+        }
+        
+        // Initialize on page load
         window.addEventListener('DOMContentLoaded', () => {
-            app = new App();
+            initCamera();
         });
         
-        function retakePhoto() {
-            // Hide selection screen
-            document.getElementById('selectionScreen').style.display = 'none';
-            
-            // Show camera
-            document.getElementById('cameraView').style.display = 'flex';
-            
-            // Reset selection
-            app.selectedText = '';
-            document.getElementById('selectedTextDisplay').textContent = 'Tap on text in the image above';
-            document.getElementById('qrPreview').style.display = 'none';
-            document.getElementById('showQRBtn').style.display = 'none';
-            
-            // Restart camera if needed
-            if (app.cameraManager) {
-                app.cameraManager.startCamera();
+        // Handle visibility change (when app goes to background)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                // Stop camera when hidden
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+            } else {
+                // Restart camera when visible
+                initCamera();
             }
-        }
-        
-        function showFullQR() {
-            document.getElementById('qrModal').style.display = 'flex';
-        }
-        
-        function hideFullQR() {
-            document.getElementById('qrModal').style.display = 'none';
-        }
-        
-        function copySelectedText() {
-            if (app && app.selectedText) {
-                navigator.clipboard.writeText(app.selectedText).then(() => {
-                    app.showNotification('Copied to clipboard!');
-                });
-            }
-        }
+        });
     </script>
 </body>
 </html>
