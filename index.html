@@ -2,66 +2,61 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#f5f5f5" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <title>Scan → Line → QR</title>
+  <title>Scan → Select Line → QR</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html, body { height: 100%; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       background: #f5f5f5;
       color: #222;
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
-      overscroll-behavior: none;
     }
     header {
-      padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+      padding: 12px 16px;
       background: #ffffff;
       border-bottom: 1px solid #ddd;
       box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      flex-shrink: 0;
     }
-    h1 { font-size: 1.1rem; font-weight: 600; color: #111; }
+    h1 { font-size: 1.15rem; font-weight: 600; color: #111; }
     button {
       background: #007aff;
       color: white;
       border: none;
-      padding: 12px 18px;
+      padding: 10px 16px;
       border-radius: 10px;
       font-size: 1rem;
       font-weight: 500;
       cursor: pointer;
       touch-action: manipulation;
-      -webkit-appearance: none;
-      appearance: none;
     }
-    button:disabled { opacity: 0.4; cursor: default; }
-    button.secondary { background: #e5e5ea; color: #111; }
-    button.small { padding: 8px 12px; font-size: 0.88rem; border-radius: 8px; }
-    button.icon-btn {
-      width: 42px; height: 42px; padding: 0;
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 10px; font-size: 1.1rem;
+    button:disabled { opacity: 0.45; }
+    button.secondary {
+      background: #e5e5ea;
+      color: #111;
+    }
+    button.small {
+      padding: 8px 12px;
+      font-size: 0.9rem;
     }
     select {
-      padding: 10px 12px;
+      padding: 8px 12px;
       border-radius: 8px;
       border: 1px solid #ccc;
-      font-size: 0.92rem;
+      font-size: 0.95rem;
       background: white;
-      max-width: 170px;
-      -webkit-appearance: none;
-      appearance: none;
+      max-width: 180px;
     }
-    #camera-view, #result-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    #camera-view, #result-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
     #video-container {
       position: relative;
       flex: 1;
@@ -70,33 +65,14 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      min-height: 0;
     }
-    video { width: 100%; height: 100%; object-fit: contain; }
-    #capture-canvas { display: none; }
-    #fallback-note {
-      position: absolute;
-      inset: 0;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      padding: 24px;
-      text-align: center;
-      color: #ddd;
-      background: #000;
-    }
-    #fallback-note p { max-width: 320px; line-height: 1.4; }
-    .guide-box {
-      position: absolute;
-      left: 6%; right: 6%; top: 30%; bottom: 30%;
-      border: 2px dashed rgba(255,255,255,0.55);
-      border-radius: 14px;
-      pointer-events: none;
+    video {
+      max-width: 100%;
+      max-height: 58vh;
+      object-fit: contain;
     }
     .controls {
-      padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+      padding: 14px 16px;
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
@@ -104,59 +80,36 @@
       align-items: center;
       background: #ffffff;
       border-top: 1px solid #ddd;
-      flex-shrink: 0;
     }
-    .camera-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: center;
-      width: 100%;
-    }
-    .action-row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-    }
-    input[type="range"] { width: 110px; }
     #lines {
       flex: 1;
       overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
       padding: 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
       background: #f5f5f5;
     }
-    .line-row { display: flex; align-items: stretch; gap: 8px; }
     .line {
-      flex: 1;
       background: #ffffff;
       padding: 14px 16px;
       border-radius: 12px;
-      font-size: 1.02rem;
+      font-size: 1.05rem;
       line-height: 1.4;
       cursor: pointer;
       border: 2px solid transparent;
       word-break: break-word;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-      outline: none;
     }
-    .line:focus, .line.selected { border-color: #007aff; background: #eaf2ff; }
-    .line[contenteditable="true"]:empty::before {
-      content: "empty — tap to edit";
-      color: #999;
+    .line:active, .line.selected {
+      border-color: #007aff;
+      background: #e8f1ff;
     }
     #qr-section {
-      padding: 18px max(18px, env(safe-area-inset-bottom));
+      padding: 18px;
       text-align: center;
       background: #ffffff;
       border-top: 1px solid #ddd;
-      flex-shrink: 0;
     }
     #qrcode {
       margin: 12px auto;
@@ -165,49 +118,22 @@
       border-radius: 12px;
       display: inline-block;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      min-height: 60px;
-      min-width: 60px;
     }
-    #qr-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
     .status {
-      font-size: 0.92rem;
+      font-size: 0.95rem;
       color: #555;
       padding: 10px 16px;
       text-align: center;
       background: #f0f0f0;
-      flex-shrink: 0;
-    }
-    .status.error { color: #b3261e; background: #fdecea; }
-    .progress-track {
-      height: 4px;
-      background: #e0e0e0;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      background: #007aff;
-      transition: width 0.15s linear;
     }
     .hidden { display: none !important; }
-    #char-count { font-size: 0.8rem; color: #888; margin-top: 4px; }
-    #char-count.warn { color: #b3261e; }
-    .spinner {
-      width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      display: inline-block;
-      vertical-align: middle;
-      margin-right: 6px;
+    .camera-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) {
-      .spinner { animation: none; }
-      .progress-fill { transition: none; }
-    }
-    #file-fallback-input { display: none; }
   </style>
 </head>
 <body>
@@ -216,476 +142,217 @@
   </header>
 
   <div id="camera-view">
-    <div class="status" id="status">Starting camera…</div>
-    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="status" id="status">Choose camera and point at text</div>
 
     <div id="video-container">
-      <video id="video" autoplay playsinline muted webkit-playsinline></video>
-      <div class="guide-box" id="guide-box"></div>
-      <div id="fallback-note">
-        <p>Live camera preview isn't available on this browser. Use the button below to take or choose a photo instead.</p>
-      </div>
+      <video id="video" autoplay playsinline muted></video>
     </div>
-    <canvas id="capture-canvas"></canvas>
 
     <div class="controls">
-      <div class="camera-row" id="camera-row">
+      <div class="camera-row">
         <select id="camera-select">
           <option value="">Loading cameras…</option>
         </select>
         <button id="btn-refocus" class="secondary small">Refocus</button>
-        <button id="btn-torch" class="secondary small hidden">Light</button>
       </div>
-      <div class="camera-row hidden" id="zoom-row">
-        <span style="font-size:0.85rem;color:#666">Zoom</span>
-        <input type="range" id="zoom-range" min="1" max="1" step="0.1" value="1" />
-      </div>
-      <div class="action-row">
-        <button id="btn-capture" disabled>Capture &amp; Scan Text</button>
-        <button id="btn-upload" class="secondary small">📁 Photo</button>
-      </div>
-      <input type="file" id="file-fallback-input" accept="image/*" capture="environment" />
+      <button id="btn-capture">Capture &amp; OCR</button>
     </div>
   </div>
 
   <div id="result-view" class="hidden">
-    <div class="status">Tap a line to generate its QR code, or tap the text to fix a typo first</div>
+    <div class="status">Tap a line to generate QR code</div>
     <div id="lines"></div>
     <div id="qr-section" class="hidden">
       <div id="qrcode"></div>
-      <div id="char-count"></div>
-      <p style="margin-top:8px;font-size:0.9rem;color:#555">Scan this QR with another device</p>
-      <div id="qr-actions">
-        <button id="btn-copy" class="secondary small">Copy text</button>
-        <button id="btn-download-qr" class="secondary small">Save QR image</button>
-      </div>
-    </div>
-    <div class="controls">
-      <button id="btn-back" class="secondary">← Back to camera</button>
-      <button id="btn-rescan">Rescan same photo</button>
+      <p style="margin-top:10px;font-size:0.95rem;color:#555">Scan this QR with another device</p>
+      <button id="btn-back" class="secondary" style="margin-top:14px">← Back to camera</button>
     </div>
   </div>
 
   <script>
-    (function () {
-      'use strict';
+    const video = document.getElementById('video');
+    const statusEl = document.getElementById('status');
+    const linesEl = document.getElementById('lines');
+    const qrSection = document.getElementById('qr-section');
+    const qrcodeEl = document.getElementById('qrcode');
+    const cameraView = document.getElementById('camera-view');
+    const resultView = document.getElementById('result-view');
+    const cameraSelect = document.getElementById('camera-select');
 
-      const video = document.getElementById('video');
-      const statusEl = document.getElementById('status');
-      const linesEl = document.getElementById('lines');
-      const qrSection = document.getElementById('qr-section');
-      const qrcodeEl = document.getElementById('qrcode');
-      const charCountEl = document.getElementById('char-count');
-      const cameraView = document.getElementById('camera-view');
-      const resultView = document.getElementById('result-view');
-      const cameraSelect = document.getElementById('camera-select');
-      const cameraRow = document.getElementById('camera-row');
-      const zoomRow = document.getElementById('zoom-row');
-      const zoomRange = document.getElementById('zoom-range');
-      const btnCapture = document.getElementById('btn-capture');
-      const btnRefocus = document.getElementById('btn-refocus');
-      const btnTorch = document.getElementById('btn-torch');
-      const btnUpload = document.getElementById('btn-upload');
-      const btnRescan = document.getElementById('btn-rescan');
-      const btnBack = document.getElementById('btn-back');
-      const btnCopy = document.getElementById('btn-copy');
-      const btnDownloadQr = document.getElementById('btn-download-qr');
-      const fileInput = document.getElementById('file-fallback-input');
-      const fallbackNote = document.getElementById('fallback-note');
-      const captureCanvas = document.getElementById('capture-canvas');
-      const progressFill = document.getElementById('progress-fill');
+    let stream = null;
+    let currentTrack = null;
+    let worker = null;
+    let devices = [];
 
-      let stream = null;
-      let currentTrack = null;
-      let worker = null;
-      let workerReady = false;
-      let torchOn = false;
-      let lastCaptureSource = null; // ImageBitmap/canvas reused for "rescan same photo"
-      let selectedQrText = '';
+    async function getCameras() {
+      try {
+        const temp = await navigator.mediaDevices.getUserMedia({ video: true });
+        temp.getTracks().forEach(t => t.stop());
 
-      const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-      const isSecure = window.isSecureContext;
+        const all = await navigator.mediaDevices.enumerateDevices();
+        devices = all.filter(d => d.kind === 'videoinput');
 
-      function setStatus(msg, isError) {
-        statusEl.textContent = msg;
-        statusEl.classList.toggle('error', !!isError);
-      }
-
-      function setProgress(pct) {
-        progressFill.style.width = Math.max(0, Math.min(100, pct)) + '%';
-      }
-
-      // ---------- OCR worker: create eagerly in the background ----------
-      async function initWorker() {
-        try {
-          worker = await Tesseract.createWorker('eng', 1, {
-            logger: (m) => {
-              if (m.status === 'recognizing text' && typeof m.progress === 'number') {
-                setProgress(m.progress * 100);
-              }
-            }
-          });
-          workerReady = true;
-        } catch (err) {
-          console.error('OCR init failed', err);
-        }
-      }
-      initWorker();
-
-      // ---------- Camera setup ----------
-      async function getCameras() {
-        if (!hasMediaDevices) {
-          enterFallbackMode('Camera API not supported on this browser.');
+        cameraSelect.innerHTML = '';
+        if (devices.length === 0) {
+          cameraSelect.innerHTML = '<option>No cameras found</option>';
           return;
         }
-        if (!isSecure) {
-          enterFallbackMode('Camera requires a secure (https) connection.');
-          return;
-        }
-        try {
-          const temp = await navigator.mediaDevices.getUserMedia({ video: true });
-          temp.getTracks().forEach((t) => t.stop());
 
-          const all = await navigator.mediaDevices.enumerateDevices();
-          const devices = all.filter((d) => d.kind === 'videoinput');
+        devices.forEach((d, i) => {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `Camera ${i + 1}`;
+          cameraSelect.appendChild(opt);
+        });
 
-          cameraSelect.innerHTML = '';
-          if (devices.length === 0) {
-            enterFallbackMode('No camera detected.');
-            return;
-          }
+        const back = devices.find(d => /back|rear|environment/i.test(d.label));
+        if (back) cameraSelect.value = back.deviceId;
 
-          devices.forEach((d, i) => {
-            const opt = document.createElement('option');
-            opt.value = d.deviceId;
-            opt.textContent = d.label || `Camera ${i + 1}`;
-            cameraSelect.appendChild(opt);
-          });
+        startCamera(cameraSelect.value);
+      } catch (err) {
+        statusEl.textContent = 'Camera permission needed';
+        console.error(err);
+      }
+    }
 
-          if (devices.length === 1) {
-            cameraRow.querySelector('select').classList.add('hidden');
-          }
-
-          const back = devices.find((d) => /back|rear|environment/i.test(d.label));
-          if (back) cameraSelect.value = back.deviceId;
-
-          startCamera(cameraSelect.value);
-        } catch (err) {
-          console.error(err);
-          enterFallbackMode('Camera permission denied or unavailable.');
-        }
+    async function startCamera(deviceId) {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
       }
 
-      function enterFallbackMode(reason) {
-        setStatus(reason + ' Use "Photo" to take or choose a picture instead.');
-        cameraRow.classList.add('hidden');
-        btnCapture.classList.add('hidden');
-        fallbackNote.style.display = 'flex';
-      }
-
-      async function startCamera(deviceId) {
-        if (stream) stream.getTracks().forEach((t) => t.stop());
-
-        try {
-          const constraints = {
-            video: {
-              deviceId: deviceId ? { exact: deviceId } : undefined,
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
-              facingMode: deviceId ? undefined : { ideal: 'environment' }
-            },
-            audio: false
-          };
-
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-          video.srcObject = stream;
-          currentTrack = stream.getVideoTracks()[0];
-          await applyFocus();
-          setupZoom();
-          setupTorch();
-          btnCapture.disabled = false;
-          setStatus('Point at text and tap Capture');
-        } catch (err) {
-          console.error(err);
-          enterFallbackMode('Could not start camera (' + err.message + ').');
-        }
-      }
-
-      async function applyFocus() {
-        if (!currentTrack || !currentTrack.getCapabilities) return;
-        try {
-          const caps = currentTrack.getCapabilities();
-          if (caps.focusMode) {
-            if (caps.focusMode.includes('continuous')) {
-              await currentTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-            } else if (caps.focusMode.includes('single-shot')) {
-              await currentTrack.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
-            }
-          }
-        } catch (e) { /* focus control unsupported — safe to ignore */ }
-      }
-
-      function setupZoom() {
-        try {
-          const caps = currentTrack.getCapabilities ? currentTrack.getCapabilities() : {};
-          if (caps.zoom) {
-            zoomRow.classList.remove('hidden');
-            zoomRange.min = caps.zoom.min;
-            zoomRange.max = caps.zoom.max;
-            zoomRange.step = caps.zoom.step || 0.1;
-            zoomRange.value = currentTrack.getSettings().zoom || caps.zoom.min;
-          } else {
-            zoomRow.classList.add('hidden');
-          }
-        } catch (e) {
-          zoomRow.classList.add('hidden');
-        }
-      }
-
-      zoomRange.addEventListener('input', async () => {
-        if (!currentTrack) return;
-        try {
-          await currentTrack.applyConstraints({ advanced: [{ zoom: parseFloat(zoomRange.value) }] });
-        } catch (e) { /* ignore */ }
-      });
-
-      function setupTorch() {
-        try {
-          const caps = currentTrack.getCapabilities ? currentTrack.getCapabilities() : {};
-          if (caps.torch) {
-            btnTorch.classList.remove('hidden');
-          } else {
-            btnTorch.classList.add('hidden');
-          }
-        } catch (e) {
-          btnTorch.classList.add('hidden');
-        }
-      }
-
-      btnTorch.addEventListener('click', async () => {
-        if (!currentTrack) return;
-        torchOn = !torchOn;
-        try {
-          await currentTrack.applyConstraints({ advanced: [{ torch: torchOn }] });
-          btnTorch.textContent = torchOn ? 'Light: On' : 'Light';
-        } catch (e) {
-          torchOn = !torchOn;
-        }
-      });
-
-      cameraSelect.addEventListener('change', () => startCamera(cameraSelect.value));
-
-      btnRefocus.addEventListener('click', () => {
-        applyFocus();
-        setStatus('Refocusing…');
-        setTimeout(() => setStatus('Point at text and tap Capture'), 700);
-      });
-
-      // ---------- Fallback: native file/camera input ----------
-      btnUpload.addEventListener('click', () => fileInput.click());
-
-      fileInput.addEventListener('change', () => {
-        const file = fileInput.files && fileInput.files[0];
-        if (!file) return;
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const scale = Math.min(1, 2000 / Math.max(img.width, img.height));
-          canvas.width = Math.round(img.width * scale);
-          canvas.height = Math.round(img.height * scale);
-          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-          runOcr(canvas);
+      try {
+        const constraints = {
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: deviceId ? undefined : { ideal: 'environment' }
+          },
+          audio: false
         };
-        img.onerror = () => setStatus('Could not load that image.', true);
-        img.src = URL.createObjectURL(file);
-      });
 
-      // ---------- Capture + OCR ----------
-      btnCapture.addEventListener('click', () => {
-        if (!stream) return;
-        const targetW = Math.min(video.videoWidth, 1920);
-        const scale = targetW / video.videoWidth;
-        captureCanvas.width = targetW;
-        captureCanvas.height = Math.round(video.videoHeight * scale);
-        captureCanvas.getContext('2d').drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-        runOcr(captureCanvas);
-      });
-
-      btnRescan.addEventListener('click', () => {
-        if (lastCaptureSource) runOcr(lastCaptureSource, true);
-      });
-
-      async function runOcr(sourceCanvas, isRescan) {
-        if (!isRescan) {
-          // remember a copy for "rescan same photo"
-          const copy = document.createElement('canvas');
-          copy.width = sourceCanvas.width;
-          copy.height = sourceCanvas.height;
-          copy.getContext('2d').drawImage(sourceCanvas, 0, 0);
-          lastCaptureSource = copy;
-        }
-
-        btnCapture.disabled = true;
-        setProgress(0);
-        setStatus('Reading text…');
-
-        // Lightweight grayscale + contrast boost tends to improve OCR accuracy
-        const ctx = sourceCanvas.getContext('2d');
-        try {
-          const imgData = ctx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-          const d = imgData.data;
-          for (let i = 0; i < d.length; i += 4) {
-            const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-            const contrasted = Math.min(255, Math.max(0, (gray - 128) * 1.25 + 128));
-            d[i] = d[i + 1] = d[i + 2] = contrasted;
-          }
-          ctx.putImageData(imgData, 0, 0);
-        } catch (e) { /* if this fails (e.g. tainted canvas), OCR still runs on the original image */ }
-
-        try {
-          if (!workerReady) {
-            setStatus('Warming up text reader…');
-            await initWorker();
-          }
-          const { data: { text, lines } } = await worker.recognize(sourceCanvas);
-
-          let lineList = [];
-          if (lines && lines.length) {
-            lineList = lines.filter((l) => l.text && l.text.trim().length > 1).map((l) => l.text.trim());
-          } else {
-            lineList = text.split(/\n+/).map((l) => l.trim()).filter((l) => l.length > 1);
-          }
-
-          if (lineList.length === 0) {
-            setStatus('No text found. Try better lighting, hold steadier, or move closer.', true);
-            btnCapture.disabled = false;
-            return;
-          }
-
-          showLines(lineList);
-        } catch (err) {
-          console.error(err);
-          setStatus('Text recognition failed: ' + err.message, true);
-        }
-        btnCapture.disabled = false;
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        currentTrack = stream.getVideoTracks()[0];
+        applyFocus();
+        statusEl.textContent = 'Point at text and tap Capture';
+      } catch (err) {
+        statusEl.textContent = 'Could not start camera: ' + err.message;
+        console.error(err);
       }
+    }
 
-      function showLines(lineList) {
+    async function applyFocus() {
+      if (!currentTrack) return;
+      try {
+        const caps = currentTrack.getCapabilities?.();
+        if (caps && caps.focusMode) {
+          if (caps.focusMode.includes('continuous')) {
+            await currentTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          } else if (caps.focusMode.includes('single-shot')) {
+            await currentTrack.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+          }
+        }
+      } catch (e) {}
+    }
+
+    cameraSelect.addEventListener('change', () => {
+      startCamera(cameraSelect.value);
+    });
+
+    document.getElementById('btn-refocus').onclick = () => {
+      applyFocus();
+      statusEl.textContent = 'Refocus requested…';
+      setTimeout(() => statusEl.textContent = 'Point at text and tap Capture', 800);
+    };
+
+    document.getElementById('btn-capture').onclick = async () => {
+      if (!stream) return;
+      const btn = document.getElementById('btn-capture');
+      btn.disabled = true;
+      statusEl.textContent = 'Running OCR… please wait';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+
+      try {
+        if (!worker) {
+          worker = await Tesseract.createWorker('eng');
+        }
+        const { data: { text, lines } } = await worker.recognize(canvas);
+
+        let lineList = [];
+        if (lines && lines.length) {
+          lineList = lines
+            .filter(l => l.text && l.text.trim().length > 1)
+            .map(l => l.text.trim());
+        } else {
+          lineList = text.split(/\n+/).map(l => l.trim()).filter(l => l.length > 1);
+        }
+
+        if (lineList.length === 0) {
+          statusEl.textContent = 'No text found. Try better lighting or different camera.';
+          btn.disabled = false;
+          return;
+        }
+
         linesEl.innerHTML = '';
-        lineList.forEach((line) => {
-          const row = document.createElement('div');
-          row.className = 'line-row';
-
+        lineList.forEach(line => {
           const div = document.createElement('div');
           div.className = 'line';
-          div.contentEditable = 'true';
-          div.spellcheck = false;
           div.textContent = line;
-          div.addEventListener('click', () => selectLine(div));
-          div.addEventListener('input', () => {
-            if (div.classList.contains('selected')) selectLine(div);
-          });
-          div.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); div.blur(); }
-          });
-
-          row.appendChild(div);
-          linesEl.appendChild(row);
+          div.onclick = () => selectLine(line, div);
+          linesEl.appendChild(div);
         });
 
         cameraView.classList.add('hidden');
         resultView.classList.remove('hidden');
         qrSection.classList.add('hidden');
+      } catch (err) {
+        statusEl.textContent = 'OCR error: ' + err.message;
+        console.error(err);
       }
+      btn.disabled = false;
+    };
 
-      function selectLine(el) {
-        document.querySelectorAll('.line').forEach((l) => l.classList.remove('selected'));
-        el.classList.add('selected');
-        generateQr(el.textContent.trim());
-      }
+    function selectLine(text, el) {
+      document.querySelectorAll('.line').forEach(l => l.classList.remove('selected'));
+      el.classList.add('selected');
 
-      let qrDebounce = null;
-      function generateQr(text) {
-        selectedQrText = text;
-        clearTimeout(qrDebounce);
-        qrSection.classList.remove('hidden');
-        qrcodeEl.innerHTML = '<p style="padding:20px;color:#666"><span class="spinner" style="border-top-color:#007aff;border-color:rgba(0,122,255,0.25)"></span>Generating…</p>';
+      qrcodeEl.innerHTML = '<p style="padding:20px;color:#666">Generating QR…</p>';
+      qrSection.classList.remove('hidden');
 
-        const bytes = new Blob([text]).size;
-        charCountEl.textContent = bytes + ' characters';
-        charCountEl.classList.toggle('warn', bytes > 800);
-        if (bytes > 2000) {
-          qrcodeEl.innerHTML = '<p style="color:#b3261e;padding:20px">Too much text for a reliable QR code.<br>Trim it down or pick a shorter line.</p>';
+      // Create a fresh canvas every time (most reliable method)
+      const canvas = document.createElement('canvas');
+
+      QRCode.toCanvas(canvas, text, {
+        width: 260,
+        margin: 2,
+        errorCorrectionLevel: 'M'
+      }, function (error) {
+        if (error) {
+          console.error('QR Error:', error);
+          qrcodeEl.innerHTML = '<p style="color:red;padding:20px">Failed to create QR.<br>Try a shorter line of text.</p>';
           return;
         }
 
-        qrDebounce = setTimeout(() => {
-          const canvas = document.createElement('canvas');
-          const ecLevel = bytes > 500 ? 'L' : 'M';
-          QRCode.toCanvas(canvas, text, { width: 260, margin: 2, errorCorrectionLevel: ecLevel }, (error) => {
-            if (error) {
-              console.error('QR Error:', error);
-              qrcodeEl.innerHTML = '<p style="color:#b3261e;padding:20px">Failed to create QR.<br>Try a shorter line of text.</p>';
-              return;
-            }
-            qrcodeEl.innerHTML = '';
-            qrcodeEl.appendChild(canvas);
-          });
-        }, 200);
-      }
-
-      btnCopy.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(selectedQrText);
-          btnCopy.textContent = 'Copied ✓';
-        } catch (e) {
-          // Fallback for browsers without Clipboard API permission
-          const ta = document.createElement('textarea');
-          ta.value = selectedQrText;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.select();
-          try { document.execCommand('copy'); btnCopy.textContent = 'Copied ✓'; }
-          catch (e2) { btnCopy.textContent = 'Copy failed'; }
-          document.body.removeChild(ta);
-        }
-        setTimeout(() => (btnCopy.textContent = 'Copy text'), 1500);
+        // Success - show the canvas
+        qrcodeEl.innerHTML = '';
+        qrcodeEl.appendChild(canvas);
       });
+    }
 
-      btnDownloadQr.addEventListener('click', () => {
-        const canvas = qrcodeEl.querySelector('canvas');
-        if (!canvas) return;
-        const link = document.createElement('a');
-        link.download = 'qr-code.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      });
+    document.getElementById('btn-back').onclick = () => {
+      resultView.classList.add('hidden');
+      cameraView.classList.remove('hidden');
+      statusEl.textContent = 'Point at text and tap Capture';
+    };
 
-      btnBack.addEventListener('click', () => {
-        resultView.classList.add('hidden');
-        cameraView.classList.remove('hidden');
-        setProgress(0);
-        setStatus(stream ? 'Point at text and tap Capture' : 'Use "Photo" to take or choose a picture');
-      });
-
-      // ---------- Cleanup to save battery/memory ----------
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden && stream) {
-          stream.getTracks().forEach((t) => t.stop());
-        } else if (!document.hidden && !stream && hasMediaDevices && !cameraView.classList.contains('hidden')) {
-          startCamera(cameraSelect.value);
-        }
-      });
-
-      window.addEventListener('beforeunload', () => {
-        if (stream) stream.getTracks().forEach((t) => t.stop());
-        if (worker) worker.terminate();
-      });
-
-      // ---------- Start ----------
-      getCameras();
-    })();
+    // Start
+    getCameras();
   </script>
 </body>
 </html>
