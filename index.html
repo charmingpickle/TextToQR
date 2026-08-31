@@ -109,7 +109,34 @@
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
+        }
+        
+        /* Lens Selection Buttons */
+        #lensSelector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .lens-btn {
+            padding: 8px 16px;
+            border: 2px solid #ddd;
+            border-radius: 20px;
+            background: white;
+            color: #333;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 50px;
+        }
+        
+        .lens-btn.active {
+            border-color: #007bff;
+            background: #007bff;
+            color: white;
         }
         
         #zoomControls {
@@ -120,13 +147,13 @@
         }
         
         #zoomOut, #zoomIn {
-            width: 40px;
-            height: 40px;
+            width: 35px;
+            height: 35px;
             border-radius: 50%;
             border: 2px solid #007bff;
             background: white;
             color: #007bff;
-            font-size: 20px;
+            font-size: 18px;
             cursor: pointer;
             flex-shrink: 0;
             display: flex;
@@ -139,7 +166,7 @@
         #zoomLevel {
             min-width: 40px;
             text-align: center;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
             color: #333;
         }
@@ -398,6 +425,10 @@
         </div>
         
         <div id="controlsBar">
+            <!-- Lens Selection -->
+            <div id="lensSelector"></div>
+            
+            <!-- Zoom Slider -->
             <div id="zoomControls">
                 <button id="zoomOut">−</button>
                 <input type="range" id="zoomSlider" min="1" max="10" value="1" step="0.1">
@@ -405,6 +436,7 @@
                 <span id="zoomLevel">1.0x</span>
             </div>
             
+            <!-- Main Controls -->
             <div id="buttonRow">
                 <button class="icon-btn" onclick="toggleFlash()" title="Flash">⚡</button>
                 <button id="shutterBtn" onclick="takePhoto()" title="Take Photo"></button>
@@ -446,6 +478,9 @@
         let flashOn = false;
         let currentZoom = 1;
         let usingFrontCamera = false;
+        let cameras = [];
+        let currentCameraIndex = -1;
+        let currentLens = '1x';
         
         async function initCamera() {
             try {
@@ -453,8 +488,14 @@
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Simple, direct request for back camera
-                await startBackCamera();
+                // Enumerate cameras to find the main sensor
+                await enumerateCameras();
+                
+                // Start with the main camera (1x lens)
+                await startMainCamera();
+                
+                // Display available lenses
+                displayLensButtons();
                 
             } catch (error) {
                 console.error('Camera init error:', error);
@@ -462,16 +503,86 @@
             }
         }
         
-        async function startBackCamera() {
+        async function enumerateCameras() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                cameras = devices.filter(device => device.kind === 'videoinput');
+                console.log('Available cameras:', cameras);
+                
+                // Identify cameras by their labels
+                cameras.forEach((camera, index) => {
+                    const label = camera.label.toLowerCase();
+                    console.log(`Camera ${index}: ${camera.label}`);
+                    
+                    // Try to identify lens type from label
+                    if (label.includes('ultra') || label.includes('wide')) {
+                        camera.lensType = '0.5x';
+                    } else if (label.includes('tele') || label.includes('zoom')) {
+                        camera.lensType = '5x';
+                    } else if (label.includes('macro')) {
+                        camera.lensType = 'macro';
+                    } else if (label.includes('front') || label.includes('selfie')) {
+                        camera.lensType = 'front';
+                    } else if (label.includes('main') || label.includes('back') || label.includes('rear')) {
+                        camera.lensType = '1x';
+                    } else {
+                        camera.lensType = '1x'; // Default to 1x
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Camera enumeration failed:', error);
+            }
+        }
+        
+        async function startMainCamera() {
+            // Find the 1x (main) camera
+            let mainCameraIndex = -1;
+            
+            // First, look for cameras labeled as "main" or "back"
+            for (let i = 0; i < cameras.length; i++) {
+                const label = cameras[i].label.toLowerCase();
+                if ((label.includes('main') || label.includes('back') || label.includes('rear')) && 
+                    !label.includes('front') && !label.includes('selfie')) {
+                    mainCameraIndex = i;
+                    break;
+                }
+            }
+            
+            // If no main camera found, look for any non-front camera
+            if (mainCameraIndex === -1) {
+                for (let i = 0; i < cameras.length; i++) {
+                    const label = cameras[i].label.toLowerCase();
+                    if (!label.includes('front') && !label.includes('selfie')) {
+                        mainCameraIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            // If still no camera found, use camera 0
+            if (mainCameraIndex === -1 && cameras.length > 0) {
+                mainCameraIndex = 0;
+            }
+            
+            if (mainCameraIndex >= 0) {
+                currentCameraIndex = mainCameraIndex;
+                await startCameraWithIndex(mainCameraIndex);
+            } else {
+                // No cameras found, try facingMode
+                await startWithFacingMode('environment');
+            }
+        }
+        
+        async function startCameraWithIndex(index) {
             try {
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Direct request for back camera - works on both iOS and Android
                 const constraints = {
                     video: {
-                        facingMode: 'environment',
+                        deviceId: { exact: cameras[index].deviceId },
                         width: { ideal: 1920 },
                         height: { ideal: 1080 }
                     },
@@ -482,69 +593,28 @@
                 video.srcObject = stream;
                 
                 const track = stream.getVideoTracks()[0];
-                document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Back Camera'}`;
+                document.getElementById('cameraStatus').textContent = `📷 ${track.label}`;
                 usingFrontCamera = false;
                 
-                // Get zoom capabilities
-                const capabilities = track.getCapabilities();
-                if (capabilities.zoom) {
-                    document.getElementById('zoomSlider').max = capabilities.zoom.max;
-                }
-                
             } catch (error) {
-                console.log('Standard back camera failed, trying alternative...');
+                console.error(`Failed to start camera ${index}:`, error);
                 
-                // Try without width/height constraints
-                try {
-                    const constraints = {
-                        video: {
-                            facingMode: 'environment'
-                        },
-                        audio: false
-                    };
-                    
-                    stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    video.srcObject = stream;
-                    
-                    const track = stream.getVideoTracks()[0];
-                    document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Back Camera'}`;
-                    usingFrontCamera = false;
-                    
-                } catch (fallbackError) {
-                    console.log('Alternative back camera failed, trying any camera...');
-                    
-                    // Last resort: any camera
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({ 
-                            video: true,
-                            audio: false 
-                        });
-                        video.srcObject = stream;
-                        
-                        const track = stream.getVideoTracks()[0];
-                        document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Camera'}`;
-                        usingFrontCamera = false;
-                        
-                    } catch (finalError) {
-                        console.error('All camera attempts failed:', finalError);
-                        document.getElementById('cameraStatus').textContent = '❌ Camera failed';
-                    }
-                }
+                // Fallback to facingMode
+                await startWithFacingMode('environment');
             }
         }
         
-        async function switchCamera() {
+        async function startWithFacingMode(mode) {
             try {
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Toggle between front and back
-                usingFrontCamera = !usingFrontCamera;
-                
                 const constraints = {
                     video: {
-                        facingMode: usingFrontCamera ? 'user' : 'environment'
+                        facingMode: mode,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
                     },
                     audio: false
                 };
@@ -553,30 +623,116 @@
                 video.srcObject = stream;
                 
                 const track = stream.getVideoTracks()[0];
-                document.getElementById('cameraStatus').textContent = `📷 ${track.label || (usingFrontCamera ? 'Front Camera' : 'Back Camera')}`;
+                document.getElementById('cameraStatus').textContent = `📷 ${track.label}`;
+                usingFrontCamera = (mode === 'user');
                 
             } catch (error) {
-                console.error('Switch camera error:', error);
+                console.error('FacingMode failed:', error);
                 
-                // Try to go back to back camera
+                // Last resort
                 try {
-                    const constraints = {
-                        video: {
-                            facingMode: 'environment'
-                        },
-                        audio: false
-                    };
-                    
-                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
                     video.srcObject = stream;
-                    usingFrontCamera = false;
-                    
-                    const track = stream.getVideoTracks()[0];
-                    document.getElementById('cameraStatus').textContent = `📷 ${track.label || 'Back Camera'}`;
-                    
-                } catch (fallbackError) {
-                    showNotification('Cannot switch camera');
+                    document.getElementById('cameraStatus').textContent = '📷 Camera';
+                } catch (finalError) {
+                    document.getElementById('cameraStatus').textContent = '❌ Camera failed';
                 }
+            }
+        }
+        
+        function displayLensButtons() {
+            const lensSelector = document.getElementById('lensSelector');
+            lensSelector.innerHTML = '';
+            
+            // Collect unique lens types (excluding front cameras)
+            const lensTypes = new Set();
+            cameras.forEach(camera => {
+                if (camera.lensType !== 'front') {
+                    lensTypes.add(camera.lensType);
+                }
+            });
+            
+            // Sort lens types (0.5x, 1x, 5x, etc.)
+            const sortedLenses = Array.from(lensTypes).sort((a, b) => {
+                const aNum = parseFloat(a) || 0;
+                const bNum = parseFloat(b) || 0;
+                return aNum - bNum;
+            });
+            
+            // Add lens buttons
+            sortedLenses.forEach(lensType => {
+                const btn = document.createElement('button');
+                btn.className = 'lens-btn';
+                btn.textContent = lensType;
+                
+                if (lensType === currentLens) {
+                    btn.classList.add('active');
+                }
+                
+                btn.onclick = () => switchLens(lensType);
+                
+                lensSelector.appendChild(btn);
+            });
+            
+            // If no lens buttons were added (e.g., only facingMode), add 1x
+            if (sortedLenses.length === 0) {
+                const btn = document.createElement('button');
+                btn.className = 'lens-btn active';
+                btn.textContent = '1x';
+                btn.onclick = () => switchLens('1x');
+                lensSelector.appendChild(btn);
+            }
+        }
+        
+        async function switchLens(lensType) {
+            currentLens = lensType;
+            
+            // Update button states
+            document.querySelectorAll('.lens-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === lensType) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            // Find camera with matching lens type
+            let targetIndex = -1;
+            
+            for (let i = 0; i < cameras.length; i++) {
+                if (cameras[i].lensType === lensType) {
+                    targetIndex = i;
+                    break;
+                }
+            }
+            
+            if (targetIndex >= 0) {
+                currentCameraIndex = targetIndex;
+                await startCameraWithIndex(targetIndex);
+                showNotification(`Switched to ${lensType} lens`);
+            } else {
+                // If lens not found, just adjust digital zoom
+                const zoomMap = {
+                    '0.5x': 1,
+                    '1x': 1,
+                    '2x': 2,
+                    '5x': 5,
+                    '10x': 10
+                };
+                
+                const zoomLevel = zoomMap[lensType] || 1;
+                await setZoom(zoomLevel);
+                showNotification(`Using digital ${lensType}`);
+            }
+        }
+        
+        async function switchCamera() {
+            // Switch between front and back
+            usingFrontCamera = !usingFrontCamera;
+            
+            if (usingFrontCamera) {
+                await startWithFacingMode('user');
+            } else {
+                await startMainCamera();
             }
         }
         
@@ -651,24 +807,20 @@
         
         async function runOCR(canvas) {
             try {
-                // Multiple OCR passes with different settings
                 const results = [];
                 
-                // Pass 1: Standard
                 const result1 = await Tesseract.recognize(canvas, 'eng', {
                     tessedit_pageseg_mode: '6',
                     preserve_interword_spaces: '1'
                 });
                 results.push(result1.data.text);
                 
-                // Pass 2: Sparse text
                 const result2 = await Tesseract.recognize(canvas, 'eng', {
                     tessedit_pageseg_mode: '11',
                     preserve_interword_spaces: '1'
                 });
                 results.push(result2.data.text);
                 
-                // Combine results
                 const combinedText = [...new Set(results.join('\n').split('\n'))].join('\n');
                 
                 return combinedText;
@@ -685,15 +837,12 @@
             const textList = document.getElementById('textList');
             textList.innerHTML = '';
             
-            // Split into lines and filter
             const lines = ocrText.split('\n')
                 .map(line => line.trim())
                 .filter(line => line.length > 0);
             
-            // Remove duplicates
             const uniqueLines = [...new Set(lines)];
             
-            // Categorize each line
             uniqueLines.forEach(line => {
                 const item = document.createElement('div');
                 item.className = 'text-item';
@@ -729,14 +878,12 @@
         }
         
         function isSerialNumber(text) {
-            // Match patterns like 5CD4345W4V
             return /^[A-Z0-9]{7,}$/.test(text) && 
                    /[A-Z]/.test(text) && 
                    /\d/.test(text);
         }
         
         function isMACAddress(text) {
-            // Match MAC address patterns
             return /^([0-9A-F]{2}[:-]){5}[0-9A-F]{2}$/i.test(text) ||
                    /^([0-9A-F]{4}\.){2}[0-9A-F]{4}$/i.test(text);
         }
