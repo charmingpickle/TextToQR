@@ -3,90 +3,173 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#111" />
+  <meta name="theme-color" content="#f5f5f5" />
   <title>Scan → Select Line → QR</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #111; color: #eee;
-      min-height: 100dvh; display: flex; flex-direction: column;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
     header {
-      padding: 12px 16px; background: #1a1a1a;
-      display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 1px solid #333;
+      padding: 12px 16px;
+      background: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #ddd;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
-    h1 { font-size: 1.1rem; font-weight: 600; }
+    h1 { font-size: 1.15rem; font-weight: 600; color: #111; }
     button {
-      background: #0a84ff; color: white; border: none;
-      padding: 10px 16px; border-radius: 8px; font-size: 1rem;
-      cursor: pointer; touch-action: manipulation;
+      background: #007aff;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      touch-action: manipulation;
     }
-    button:disabled { opacity: 0.5; }
-    button.secondary { background: #333; }
-    #camera-view, #result-view { flex: 1; display: flex; flex-direction: column; }
+    button:disabled { opacity: 0.45; }
+    button.secondary {
+      background: #e5e5ea;
+      color: #111;
+    }
+    button.small {
+      padding: 8px 12px;
+      font-size: 0.9rem;
+    }
+    select {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 0.95rem;
+      background: white;
+      max-width: 180px;
+    }
+    #camera-view, #result-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
     #video-container {
-      position: relative; flex: 1; background: #000;
-      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      flex: 1;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
     }
-    video, canvas {
-      max-width: 100%; max-height: 60vh; object-fit: contain;
-    }
-    #overlay {
-      position: absolute; inset: 0; pointer-events: none;
-      border: 2px solid #0a84ff; border-radius: 8px; margin: 12px;
+    video {
+      max-width: 100%;
+      max-height: 58vh;
+      object-fit: contain;
     }
     .controls {
-      padding: 16px; display: flex; gap: 12px; justify-content: center;
-      background: #1a1a1a; border-top: 1px solid #333;
+      padding: 14px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+      background: #ffffff;
+      border-top: 1px solid #ddd;
     }
     #lines {
-      flex: 1; overflow-y: auto; padding: 12px;
-      display: flex; flex-direction: column; gap: 8px;
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #f5f5f5;
     }
     .line {
-      background: #222; padding: 12px 16px; border-radius: 8px;
-      font-size: 1rem; line-height: 1.4; cursor: pointer;
-      border: 2px solid transparent; word-break: break-word;
+      background: #ffffff;
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-size: 1.05rem;
+      line-height: 1.4;
+      cursor: pointer;
+      border: 2px solid transparent;
+      word-break: break-word;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-    .line:active, .line.selected { border-color: #0a84ff; background: #1a2a3a; }
+    .line:active, .line.selected {
+      border-color: #007aff;
+      background: #e8f1ff;
+    }
     #qr-section {
-      padding: 16px; text-align: center; background: #1a1a1a;
-      border-top: 1px solid #333;
+      padding: 18px;
+      text-align: center;
+      background: #ffffff;
+      border-top: 1px solid #ddd;
     }
-    #qrcode { margin: 12px auto; background: white; padding: 12px; border-radius: 8px; display: inline-block; }
+    #qrcode {
+      margin: 12px auto;
+      background: white;
+      padding: 14px;
+      border-radius: 12px;
+      display: inline-block;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
     #qrcode canvas { display: block; }
-    .status { font-size: 0.9rem; color: #aaa; padding: 8px 16px; text-align: center; }
+    .status {
+      font-size: 0.95rem;
+      color: #555;
+      padding: 10px 16px;
+      text-align: center;
+      background: #f0f0f0;
+    }
     .hidden { display: none !important; }
+    .camera-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>Scan → Line → QR</h1>
-    <button id="btn-switch" class="secondary" style="padding:8px 12px;font-size:0.85rem">Front</button>
   </header>
 
   <div id="camera-view">
-    <div class="status" id="status">Point at a screen / document and capture</div>
+    <div class="status" id="status">Choose camera and point at text</div>
+
     <div id="video-container">
       <video id="video" autoplay playsinline muted></video>
-      <div id="overlay"></div>
     </div>
+
     <div class="controls">
+      <div class="camera-row">
+        <select id="camera-select">
+          <option value="">Loading cameras…</option>
+        </select>
+        <button id="btn-refocus" class="secondary small">Refocus</button>
+      </div>
       <button id="btn-capture">Capture &amp; OCR</button>
     </div>
   </div>
 
   <div id="result-view" class="hidden">
-    <div class="status">Tap a line to generate QR</div>
+    <div class="status">Tap a line to generate QR code</div>
     <div id="lines"></div>
     <div id="qr-section" class="hidden">
       <div id="qrcode"></div>
-      <p style="margin-top:8px;font-size:0.9rem;color:#aaa">Scan this with another device</p>
-      <button id="btn-back" class="secondary" style="margin-top:12px">← Back to camera</button>
+      <p style="margin-top:10px;font-size:0.95rem;color:#555">Scan this QR with another device</p>
+      <button id="btn-back" class="secondary" style="margin-top:14px">← Back to camera</button>
     </div>
   </div>
 
@@ -98,75 +181,141 @@
     const qrcodeEl = document.getElementById('qrcode');
     const cameraView = document.getElementById('camera-view');
     const resultView = document.getElementById('result-view');
+    const cameraSelect = document.getElementById('camera-select');
 
     let stream = null;
-    let facingMode = 'environment'; // back camera
+    let currentTrack = null;
     let worker = null;
+    let devices = [];
 
-    async function startCamera() {
-      if (stream) stream.getTracks().forEach(t => t.stop());
+    async function getCameras() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode,
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
+        // Need temporary permission to get labels
+        const temp = await navigator.mediaDevices.getUserMedia({ video: true });
+        temp.getTracks().forEach(t => t.stop());
+
+        const all = await navigator.mediaDevices.enumerateDevices();
+        devices = all.filter(d => d.kind === 'videoinput');
+
+        cameraSelect.innerHTML = '';
+        if (devices.length === 0) {
+          cameraSelect.innerHTML = '<option>No cameras found</option>';
+          return;
+        }
+
+        devices.forEach((d, i) => {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `Camera ${i + 1}`;
+          cameraSelect.appendChild(opt);
         });
-        video.srcObject = stream;
-        statusEl.textContent = 'Point at text and tap Capture';
+
+        // Prefer back camera if available
+        const back = devices.find(d => /back|rear|environment/i.test(d.label));
+        if (back) cameraSelect.value = back.deviceId;
+
+        startCamera(cameraSelect.value);
       } catch (err) {
-        statusEl.textContent = 'Camera error: ' + err.message;
+        statusEl.textContent = 'Camera permission needed';
         console.error(err);
       }
     }
 
-    document.getElementById('btn-switch').onclick = () => {
-      facingMode = facingMode === 'environment' ? 'user' : 'environment';
-      document.getElementById('btn-switch').textContent = facingMode === 'environment' ? 'Front' : 'Back';
-      startCamera();
+    async function startCamera(deviceId) {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+
+      try {
+        const constraints = {
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: deviceId ? undefined : { ideal: 'environment' }
+          },
+          audio: false
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        currentTrack = stream.getVideoTracks()[0];
+
+        // Try continuous autofocus
+        applyFocus();
+
+        statusEl.textContent = 'Point at text and tap Capture';
+      } catch (err) {
+        statusEl.textContent = 'Could not start camera: ' + err.message;
+        console.error(err);
+      }
+    }
+
+    async function applyFocus() {
+      if (!currentTrack) return;
+      try {
+        const caps = currentTrack.getCapabilities?.();
+        if (caps && caps.focusMode && caps.focusMode.includes('continuous')) {
+          await currentTrack.applyConstraints({
+            advanced: [{ focusMode: 'continuous' }]
+          });
+        } else if (caps && caps.focusMode && caps.focusMode.includes('single-shot')) {
+          await currentTrack.applyConstraints({
+            advanced: [{ focusMode: 'single-shot' }]
+          });
+        }
+      } catch (e) {
+        // Focus not supported on this device – ignore
+      }
+    }
+
+    cameraSelect.addEventListener('change', () => {
+      startCamera(cameraSelect.value);
+    });
+
+    document.getElementById('btn-refocus').onclick = () => {
+      applyFocus();
+      statusEl.textContent = 'Refocus requested…';
+      setTimeout(() => {
+        statusEl.textContent = 'Point at text and tap Capture';
+      }, 800);
     };
 
     document.getElementById('btn-capture').onclick = async () => {
       if (!stream) return;
       const btn = document.getElementById('btn-capture');
       btn.disabled = true;
-      statusEl.textContent = 'Capturing & running OCR… (may take a few seconds)';
+      statusEl.textContent = 'Running OCR… please wait';
 
-      // Capture frame
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0);
 
-      // OCR
       try {
         if (!worker) {
-          worker = await Tesseract.createWorker('eng'); // add more langs if needed: 'eng+chi_sim' etc.
+          worker = await Tesseract.createWorker('eng');
         }
         const { data: { text, lines } } = await worker.recognize(canvas);
 
-        // Prefer structured lines if available, otherwise split text
         let lineList = [];
         if (lines && lines.length) {
           lineList = lines
-            .filter(l => l.text.trim().length > 1)
+            .filter(l => l.text && l.text.trim().length > 1)
             .map(l => l.text.trim());
         } else {
           lineList = text.split(/\n+/).map(l => l.trim()).filter(l => l.length > 1);
         }
 
         if (lineList.length === 0) {
-          statusEl.textContent = 'No text detected. Try again with better lighting / closer.';
+          statusEl.textContent = 'No text found. Try better lighting or different camera.';
           btn.disabled = false;
           return;
         }
 
-        // Show lines
         linesEl.innerHTML = '';
-        lineList.forEach((line, i) => {
+        lineList.forEach(line => {
           const div = document.createElement('div');
           div.className = 'line';
           div.textContent = line;
@@ -177,9 +326,8 @@
         cameraView.classList.add('hidden');
         resultView.classList.remove('hidden');
         qrSection.classList.add('hidden');
-        statusEl.textContent = 'Tap a line';
       } catch (err) {
-        statusEl.textContent = 'OCR failed: ' + err.message;
+        statusEl.textContent = 'OCR error: ' + err.message;
         console.error(err);
       }
       btn.disabled = false;
@@ -191,12 +339,12 @@
 
       qrcodeEl.innerHTML = '';
       QRCode.toCanvas(document.createElement('canvas'), text, {
-        width: 256,
+        width: 260,
         margin: 2,
         errorCorrectionLevel: 'M'
       }, (err, canvas) => {
         if (err) {
-          qrcodeEl.textContent = 'QR error: ' + err;
+          qrcodeEl.textContent = 'Could not create QR';
           return;
         }
         qrcodeEl.appendChild(canvas);
@@ -210,8 +358,8 @@
       statusEl.textContent = 'Point at text and tap Capture';
     };
 
-    // Init
-    startCamera();
+    // Start
+    getCameras();
   </script>
 </body>
 </html>
