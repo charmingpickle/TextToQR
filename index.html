@@ -54,6 +54,7 @@
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      cursor: crosshair;
     }
 
     video, #captured-image {
@@ -62,7 +63,7 @@
       object-fit: contain;
     }
 
-    /* Top Camera Selection Bar */
+    /* Top Controls Bar */
     .top-bar {
       position: absolute;
       top: 16px;
@@ -101,8 +102,8 @@
     }
 
     .view-finder::after {
-      content: "Hold steady near monitor text";
-      color: rgba(255, 255, 255, 0.7);
+      content: "Tap video to focus";
+      color: rgba(255, 255, 255, 0.85);
       font-size: 0.8rem;
       font-weight: 600;
       letter-spacing: 0.5px;
@@ -113,7 +114,7 @@
       backdrop-filter: blur(4px);
     }
 
-    /* Bounding Box Targets */
+    /* OCR Target Selection Boxes */
     #overlay-container {
       position: absolute;
       top: 0; left: 0;
@@ -137,7 +138,7 @@
       border-color: #ffffff;
     }
 
-    /* Loading Overlay */
+    /* Loader */
     .loader-overlay {
       position: absolute;
       inset: 0;
@@ -164,7 +165,7 @@
       to { transform: rotate(360deg); }
     }
 
-    /* Control Bar */
+    /* Shutter Bar */
     .control-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
@@ -199,7 +200,7 @@
       background: #fff;
     }
 
-    /* Header & UI Buttons */
+    /* Action Headers & Footers */
     .view-header {
       padding: 18px 20px;
       background: var(--bg-surface);
@@ -243,7 +244,7 @@
       border: 1px solid var(--border-color);
     }
 
-    /* Output QR View */
+    /* Output View */
     #qr-container-view {
       flex: 1;
       overflow-y: auto;
@@ -304,7 +305,7 @@
         <option value="">Detecting cameras...</option>
       </select>
     </div>
-    <div class="viewport">
+    <div class="viewport" id="camera-viewport">
       <video id="video" autoplay playsinline muted></video>
       <div class="view-finder"></div>
     </div>
@@ -315,7 +316,7 @@
     </div>
   </div>
 
-  <!-- SELECT VIEW -->
+  <!-- OCR SELECTION VIEW -->
   <div id="select-view" class="view hidden">
     <div class="view-header">Tap text box to convert to QR</div>
     <div class="viewport">
@@ -331,7 +332,7 @@
     </div>
   </div>
 
-  <!-- QR OUTPUT VIEW -->
+  <!-- QR DISPLAY VIEW -->
   <div id="qr-view" class="view hidden">
     <div class="view-header">Generated QR Code</div>
     <div id="qr-container-view">
@@ -352,6 +353,7 @@
   <script>
     const video = document.getElementById('video');
     const cameraSelect = document.getElementById('camera-select');
+    const cameraViewport = document.getElementById('camera-viewport');
     const cameraView = document.getElementById('camera-view');
     const selectView = document.getElementById('select-view');
     const qrView = document.getElementById('qr-view');
@@ -365,10 +367,9 @@
     let stream = null;
     let tesseractWorker = null;
 
-    // --- 1. DIRECT CAMERA SELECTION INITIALIZATION ---
+    // --- 1. CAMERA SELECTION & ENUMERATION ---
     async function initCameras() {
       try {
-        // Request permissions first to unlock camera labels
         const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
         tempStream.getTracks().forEach(t => t.stop());
 
@@ -381,7 +382,6 @@
           return;
         }
 
-        // Auto-select best rear camera candidate
         let selectedId = videoInputs[0].deviceId;
         videoInputs.forEach((device, index) => {
           const option = document.createElement('option');
@@ -389,7 +389,6 @@
           const label = device.label || `Camera ${index + 1}`;
           option.textContent = label;
 
-          // Target primary rear camera (excluding ultra-wide/macro where possible)
           const l = label.toLowerCase();
           if ((l.includes('back') || l.includes('rear') || l.includes('environment')) &&
               !l.includes('wide') && !l.includes('ultra') && !l.includes('macro')) {
@@ -405,6 +404,7 @@
       }
     }
 
+    // --- 2. FOCUS DISTANCE PROBING & HARDWARE INITIALIZATION ---
     async function startCamera(deviceId) {
       if (stream) stream.getTracks().forEach(t => t.stop());
 
@@ -412,7 +412,8 @@
         video: {
           deviceId: deviceId ? { exact: deviceId } : undefined,
           width: { ideal: 3840 },
-          height: { ideal: 2160 }
+          height: { ideal: 2160 },
+          frameRate: { ideal: 30 }
         },
         audio: false
       };
@@ -421,22 +422,81 @@
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
 
-        // Apply Focus & Zoom Hardware Constraints
         const track = stream.getVideoTracks()[0];
-        const caps = track.getCapabilities?.() || {};
-        const advanced = [];
-        if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' });
-        if (advanced.length) await track.applyConstraints({ advanced }).catch(() => {});
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        const advancedConstraints = {};
+
+        // Force continuous auto focus mode
+        if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+          advancedConstraints.focusMode = 'continuous';
+        }
+
+        // Set focus to maximum close range (macro boundary)
+        if (capabilities.focusDistance) {
+          advancedConstraints.focusDistance = capabilities.focusDistance.max;
+        }
+
+        // Apply a minor zoom boost (1.5x) to back off from screen surface while maintaining tight focus
+        if (capabilities.zoom) {
+          const idealZoom = Math.min(1.5, capabilities.zoom.max);
+          advancedConstraints.zoom = Math.max(capabilities.zoom.min, idealZoom);
+        }
+
+        if (Object.keys(advancedConstraints).length > 0) {
+          await track.applyConstraints({ advanced: [advancedConstraints] }).catch(() => {});
+        }
+
+        enableTapToFocus(track, capabilities);
       } catch (err) {
-        console.error('Error opening selected camera', err);
+        console.error('Error starting camera:', err);
       }
     }
 
     cameraSelect.onchange = () => startCamera(cameraSelect.value);
 
-    // --- 2. MULTI-PASS PREPROCESSING PIPELINE ---
+    // --- 3. TAP-TO-FOCUS OVERRIDE ---
+    function enableTapToFocus(track, capabilities) {
+      cameraViewport.onclick = async (event) => {
+        if (!capabilities.focusMode) return;
+
+        try {
+          if (capabilities.focusMode.includes('single-shot')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+          } else if (capabilities.focusMode.includes('continuous')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          }
+          showFocusRing(event.clientX, event.clientY);
+        } catch (e) {
+          console.log('Focus re-trigger failed:', e);
+        }
+      };
+    }
+
+    function showFocusRing(x, y) {
+      let ring = document.getElementById('focus-ring');
+      if (!ring) {
+        ring = document.createElement('div');
+        ring.id = 'focus-ring';
+        ring.style.cssText = `
+          position: absolute; width: 60px; height: 60px;
+          border: 2px solid #60a5fa; border-radius: 50%;
+          pointer-events: none; transform: translate(-50%, -50%) scale(1.4);
+          transition: all 0.25s cubic-bezier(0,0,0.2,1); z-index: 30; opacity: 1;
+        `;
+        cameraViewport.appendChild(ring);
+      }
+      ring.style.left = `${x}px`;
+      ring.style.top = `${y}px`;
+      ring.style.opacity = '1';
+      ring.style.transform = 'translate(-50%, -50%) scale(1)';
+      
+      setTimeout(() => { ring.style.opacity = '0'; }, 500);
+    }
+
+    // --- 4. MULTI-PASS OCR PIPELINE ---
     function generatePasses(sourceCanvas) {
-      const maxDim = 1800; // Optimal scaling for Tesseract DPI target
+      const maxDim = 1800;
       let w = sourceCanvas.width;
       let h = sourceCanvas.height;
 
@@ -445,14 +505,13 @@
         else { w = Math.round((w * maxDim) / h); h = maxDim; }
       }
 
-      // Base Canvas
       const baseCanvas = document.createElement('canvas');
       baseCanvas.width = w; baseCanvas.height = h;
       const bCtx = baseCanvas.getContext('2d');
       bCtx.drawImage(sourceCanvas, 0, 0, w, h);
       const baseData = bCtx.getImageData(0, 0, w, h);
 
-      // --- Pass 1: Sharpened Grayscale (Best for Anti-Aliased Code/Ide Text) ---
+      // Pass 1: Sharpened Grayscale
       const pass1Canvas = document.createElement('canvas');
       pass1Canvas.width = w; pass1Canvas.height = h;
       const p1Ctx = pass1Canvas.getContext('2d');
@@ -463,7 +522,6 @@
         gray[j] = baseData.data[i] * 0.299 + baseData.data[i + 1] * 0.587 + baseData.data[i + 2] * 0.114;
       }
 
-      // 3x3 Sharpen Kernel
       for (let y = 1; y < h - 1; y++) {
         for (let x = 1; x < w - 1; x++) {
           const idx = y * w + x;
@@ -476,13 +534,12 @@
       }
       p1Ctx.putImageData(p1Data, 0, 0);
 
-      // --- Pass 2: Adaptive Sauvola Binarization (Best for Glare & Bright Monitors) ---
+      // Pass 2: Adaptive Sauvola Binarization
       const pass2Canvas = document.createElement('canvas');
       pass2Canvas.width = w; pass2Canvas.height = h;
       const p2Ctx = pass2Canvas.getContext('2d');
       const p2Data = p2Ctx.createImageData(w, h);
 
-      const windowSize = 25;
       const halfW = 12;
       const k = 0.2;
       const R = 128;
@@ -530,7 +587,7 @@
       return { pass1Canvas, pass2Canvas, width: w, height: h };
     }
 
-    // Capture & Execute OCR
+    // --- 5. EXECUTION & SELECTION LOGIC ---
     document.getElementById('btn-capture').onclick = () => {
       if (!video.videoWidth) return;
 
@@ -569,7 +626,6 @@
         loaderStatus.textContent = 'Running Pass 2 (Binarized)...';
         const res2 = await tesseractWorker.recognize(pass2Canvas);
 
-        // Deduplicate & pick highest confidence text blocks
         const combined = mergeOCRResults(res1.data.words || [], res2.data.words || []);
         renderBoundingBoxes(combined, width, height);
       } catch (err) {
@@ -588,7 +644,6 @@
         const text = word.text.trim();
         if (text.length < 2 || word.confidence < 45) return;
 
-        // Check if box overlaps with an existing detected box
         const duplicate = merged.find(existing => {
           const overlapX = Math.abs(existing.bbox.x0 - word.bbox.x0) < 15;
           const overlapY = Math.abs(existing.bbox.y0 - word.bbox.y0) < 15;
@@ -598,7 +653,6 @@
         if (!duplicate) {
           merged.push(word);
         } else if (word.confidence > duplicate.confidence) {
-          // Replace with higher-confidence detection
           const idx = merged.indexOf(duplicate);
           merged[idx] = word;
         }
