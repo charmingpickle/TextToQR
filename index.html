@@ -34,6 +34,30 @@
       justify-content: center;
       overflow: hidden;
     }
+    .focus-reticle {
+      position: absolute;
+      width: 72px; height: 72px;
+      margin-left: -36px;
+      margin-top: -36px;
+      border: 2px solid #ffd60a;
+      border-radius: 8px;
+      pointer-events: none;
+      animation: focus-pulse 0.6s ease-out;
+      z-index: 5;
+    }
+    #live-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      z-index: 4;
+    }
+    #live-overlay .tap-target {
+      pointer-events: auto;
+    }
+    @keyframes focus-pulse {
+      0% { transform: scale(1.5); opacity: 1; }
+      100% { transform: scale(1); opacity: 0.9; }
+    }
     video, #captured-image {
       max-width: 100%;
       max-height: 100%;
@@ -97,6 +121,17 @@
       text-align: center;
       font-size: 1rem;
       background: linear-gradient(rgba(0,0,0,0.65), transparent);
+      z-index: 10;
+    }
+    .blur-warning {
+      position: absolute;
+      top: 52px; left: 16px; right: 16px;
+      padding: 10px 14px;
+      background: rgba(255, 149, 0, 0.92);
+      color: #1a1a1a;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      text-align: center;
       z-index: 10;
     }
     .select-controls {
@@ -173,6 +208,8 @@
     <div class="status-bar" id="status">Point at the text</div>
     <div id="video-container">
       <video id="video" autoplay playsinline muted></video>
+      <div id="live-overlay"></div>
+      <div id="focus-reticle" class="focus-reticle hidden"></div>
     </div>
     <div class="camera-controls">
       <button class="icon-btn" id="btn-switch">⟳</button>
@@ -185,6 +222,7 @@
 
   <div id="select-view" class="view hidden">
     <div class="status-bar" id="select-status">Reading photo…</div>
+    <div class="blur-warning hidden" id="blur-warning">Photo may be blurry — consider retaking</div>
     <div id="select-container">
       <img id="captured-image" />
       <svg id="overlay"></svg>
@@ -215,13 +253,21 @@
     const qrView = document.getElementById('qr-view');
     const capturedImage = document.getElementById('captured-image');
     const overlay = document.getElementById('overlay');
+    const blurWarning = document.getElementById('blur-warning');
+    const focusReticle = document.getElementById('focus-reticle');
+    const liveOverlay = document.getElementById('live-overlay');
+
+    let liveScanEnabled = false;
+    let liveScanBusy = false;
+    let liveScanTimer = null;
+    let cameFromLive = false;
     const resultText = document.getElementById('result-text');
     const qrcodeEl = document.getElementById('qrcode');
 
     let stream = null;
     let currentTrack = null;
     let devices = [];
-    let currentDeviceIndex = 0;
+    let currentStreamDeviceId = null;
     let worker = null;
     let fullCanvas = null;
     let scanCanvas = null;
@@ -230,33 +276,35 @@
 
     async function initCameras() {
       try {
-        const temp = await navigator.mediaDevices.getUserMedia({ video: true });
-        temp.getTracks().forEach(t => t.stop());
+        // Ask for the environment-facing camera directly rather than guessing
+        // from device labels. Browsers map "environment" to the primary rear
+        // lens (not ultra-wide/telephoto on multi-lens phones), and requesting
+        // a high ideal resolution gets the sensor's full capability instead of
+        // a default low-res stream.
+        await startCamera({ facingMode: { ideal: 'environment' } });
 
         devices = (await navigator.mediaDevices.enumerateDevices())
           .filter(d => d.kind === 'videoinput');
 
-        const backIndex = devices.findIndex(d => /back|rear|environment/i.test(d.label));
-        currentDeviceIndex = backIndex >= 0 ? backIndex : 0;
-        startCamera(devices[currentDeviceIndex]?.deviceId);
+        startLiveScan();
       } catch (e) {
         statusEl.textContent = 'Camera permission needed';
       }
     }
 
-    async function startCamera(deviceId) {
+    async function startCamera(videoConstraint) {
       if (stream) stream.getTracks().forEach(t => t.stop());
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          },
+          video: Object.assign({
+            width: { ideal: 4096 },
+            height: { ideal: 2160 }
+          }, videoConstraint),
           audio: false
         });
         video.srcObject = stream;
         currentTrack = stream.getVideoTracks()[0];
+        currentStreamDeviceId = currentTrack.getSettings().deviceId || null;
 
         try {
           const caps = currentTrack.getCapabilities?.();
@@ -275,12 +323,226 @@
 
     document.getElementById('btn-switch').onclick = () => {
       if (devices.length < 2) return;
-      currentDeviceIndex = (currentDeviceIndex + 1) % devices.length;
-      startCamera(devices[currentDeviceIndex].deviceId);
+      const idx = devices.findIndex(d => d.deviceId === currentStreamDeviceId);
+      const nextIdx = (idx + 1) % devices.length;
+      startCamera({ deviceId: { exact: devices[nextIdx].deviceId } });
     };
+
+    function showFocusReticle(x, y) {
+      focusReticle.style.left = x + 'px';
+      focusReticle.style.top = y + 'px';
+      focusReticle.classList.remove('hidden');
+      focusReticle.style.animation = 'none';
+      void focusReticle.offsetWidth; // restart the pulse animation
+      focusReticle.style.animation = '';
+      clearTimeout(focusReticle._hideTimer);
+      focusReticle._hideTimer = setTimeout(() => focusReticle.classList.add('hidden'), 700);
+    }
+
+    async function focusAt(e) {
+      if (!video.videoWidth || !currentTrack) return;
+
+      const rect = video.getBoundingClientRect();
+      const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+      const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+
+      // The video element uses object-fit: contain, so the actual rendered
+      // frame is usually smaller than the box and letterboxed — map the tap
+      // into normalized (0-1) video coordinates, accounting for that.
+      const videoAspect = video.videoWidth / video.videoHeight;
+      const boxAspect = rect.width / rect.height;
+      let renderedW, renderedH, offsetX, offsetY;
+      if (videoAspect > boxAspect) {
+        renderedW = rect.width;
+        renderedH = rect.width / videoAspect;
+        offsetX = 0;
+        offsetY = (rect.height - renderedH) / 2;
+      } else {
+        renderedH = rect.height;
+        renderedW = rect.height * videoAspect;
+        offsetX = (rect.width - renderedW) / 2;
+        offsetY = 0;
+      }
+
+      const localX = clientX - rect.left - offsetX;
+      const localY = clientY - rect.top - offsetY;
+      if (localX < 0 || localY < 0 || localX > renderedW || localY > renderedH) return;
+
+      showFocusReticle(clientX - rect.left, clientY - rect.top);
+
+      const nx = localX / renderedW;
+      const ny = localY / renderedH;
+
+      try {
+        const caps = currentTrack.getCapabilities?.();
+        const advanced = [];
+        // Not widely supported (mainly Chrome on Android) — Safari/iOS exposes
+        // no manual focus control to web pages, so this silently no-ops there.
+        if (caps?.pointsOfInterest) {
+          advanced.push({ pointsOfInterest: [{ x: nx, y: ny }] });
+        }
+        if (caps?.focusMode?.includes('single-shot')) {
+          advanced.push({ focusMode: 'single-shot' });
+        } else if (caps?.focusMode?.includes('continuous')) {
+          advanced.push({ focusMode: 'continuous' });
+        }
+        if (advanced.length) {
+          await currentTrack.applyConstraints({ advanced });
+        }
+      } catch (err) {
+        // Unsupported on this device/browser — reticle still gave visual feedback.
+      }
+    }
+
+    document.getElementById('video-container').addEventListener('click', focusAt);
+
+    function startLiveScan() {
+      if (liveScanEnabled) return;
+      liveScanEnabled = true;
+      liveScanLoop();
+    }
+
+    function stopLiveScan() {
+      liveScanEnabled = false;
+      clearTimeout(liveScanTimer);
+      liveOverlay.innerHTML = '';
+    }
+
+    async function liveScanLoop() {
+      if (!liveScanEnabled) return;
+
+      if (liveScanBusy || !video.videoWidth) {
+        liveScanTimer = setTimeout(liveScanLoop, 300);
+        return;
+      }
+      liveScanBusy = true;
+
+      try {
+        // Small, fast frame for near-real-time detection — accuracy trade-off
+        // vs. the full-res manual capture, which is why that fallback stays.
+        const maxDim = 700;
+        const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+        const w = Math.round(video.videoWidth * scale);
+        const h = Math.round(video.videoHeight * scale);
+        const frame = document.createElement('canvas');
+        frame.width = w;
+        frame.height = h;
+        frame.getContext('2d').drawImage(video, 0, 0, w, h);
+        preprocess(frame);
+
+        if (!worker) worker = await Tesseract.createWorker('eng');
+        await worker.setParameters({
+          tessedit_pageseg_mode: '11',
+          tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-:',
+          preserve_interword_spaces: '0'
+        });
+        const { data } = await worker.recognize(frame);
+
+        const boxes = (data.words || [])
+          .map(wd => ({
+            text: (wd.text || '').replace(/[^0-9A-Z\-:]/g, '').trim(),
+            bbox: wd.bbox
+          }))
+          .filter(wd => wd.text.length >= 2);
+
+        if (liveScanEnabled) renderLiveTargets(boxes, w, h);
+      } catch (err) {
+        console.error(err);
+      }
+
+      liveScanBusy = false;
+      if (liveScanEnabled) liveScanTimer = setTimeout(liveScanLoop, 350);
+    }
+
+    function renderLiveTargets(boxes, frameW, frameH) {
+      liveOverlay.innerHTML = '';
+      if (!video.videoWidth) return;
+
+      const rect = video.getBoundingClientRect();
+      const videoAspect = video.videoWidth / video.videoHeight;
+      const boxAspect = rect.width / rect.height;
+      let renderedW, renderedH, offsetX, offsetY;
+      if (videoAspect > boxAspect) {
+        renderedW = rect.width;
+        renderedH = rect.width / videoAspect;
+        offsetX = 0;
+        offsetY = (rect.height - renderedH) / 2;
+      } else {
+        renderedH = rect.height;
+        renderedW = rect.height * videoAspect;
+        offsetX = (rect.width - renderedW) / 2;
+        offsetY = 0;
+      }
+
+      const sx = renderedW / frameW;
+      const sy = renderedH / frameH;
+
+      boxes.forEach(b => {
+        const x = offsetX + b.bbox.x0 * sx;
+        const y = offsetY + b.bbox.y0 * sy;
+        const width = (b.bbox.x1 - b.bbox.x0) * sx;
+        const height = (b.bbox.y1 - b.bbox.y0) * sy;
+
+        const div = document.createElement('div');
+        div.className = 'tap-target';
+        div.style.left = x + 'px';
+        div.style.top = y + 'px';
+        div.style.width = Math.max(width, 30) + 'px';
+        div.style.height = Math.max(height, 26) + 'px';
+        div.onclick = (e) => {
+          e.stopPropagation();
+          pickLiveValue(b.text);
+        };
+        liveOverlay.appendChild(div);
+      });
+    }
+
+    function pickLiveValue(text) {
+      stopLiveScan();
+      cameFromLive = true;
+      cameraView.classList.add('hidden');
+      resultText.textContent = text;
+      qrView.classList.remove('hidden');
+      generateQR(text);
+    }
+
+    // Rough sharpness check: variance of a Laplacian edge-response on a small
+    // grayscale copy. Blurry photos have low variance (few sharp edges);
+    // this is just an advisory heuristic, not a hard block.
+    function isLikelyBlurry(canvas) {
+      const w = 300;
+      const h = Math.round(canvas.height * (w / canvas.width));
+      const small = document.createElement('canvas');
+      small.width = w;
+      small.height = h;
+      const sctx = small.getContext('2d');
+      sctx.drawImage(canvas, 0, 0, w, h);
+
+      const { data } = sctx.getImageData(0, 0, w, h);
+      const gray = new Float32Array(w * h);
+      for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+        gray[j] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      }
+
+      let sum = 0, sumSq = 0, count = 0;
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = y * w + x;
+          const lap = -4 * gray[idx] + gray[idx - 1] + gray[idx + 1] + gray[idx - w] + gray[idx + w];
+          sum += lap;
+          sumSq += lap * lap;
+          count++;
+        }
+      }
+      const mean = sum / count;
+      const variance = sumSq / count - mean * mean;
+      return variance < 120;
+    }
 
     document.getElementById('btn-capture').onclick = () => {
       if (!video.videoWidth) return;
+      stopLiveScan();
+      cameFromLive = false;
 
       fullCanvas = document.createElement('canvas');
       fullCanvas.width = video.videoWidth;
@@ -293,6 +555,7 @@
       selectView.classList.remove('hidden');
       selectStatus.textContent = 'Reading photo…';
       overlay.innerHTML = '';
+      blurWarning.classList.toggle('hidden', !isLikelyBlurry(fullCanvas));
 
       capturedImage.onload = () => {
         runFullOCR();
@@ -358,7 +621,7 @@
 
     async function runFullOCR() {
       // Downscale huge camera photos before OCR for speed.
-      const maxDim = 2000;
+      const maxDim = 2600;
       const scale = Math.min(1, maxDim / Math.max(fullCanvas.width, fullCanvas.height));
       scanCanvas = document.createElement('canvas');
       scanCanvas.width = Math.round(fullCanvas.width * scale);
@@ -438,6 +701,7 @@
     }
 
     function selectValue(text) {
+      cameFromLive = false;
       resultText.textContent = text;
       selectView.classList.add('hidden');
       qrView.classList.remove('hidden');
@@ -469,17 +733,23 @@
 
     document.getElementById('btn-pick-another').onclick = () => {
       qrView.classList.add('hidden');
-      selectView.classList.remove('hidden');
-      // Redraw in case the viewport changed while the QR view was up.
-      drawTapTargets();
+      if (cameFromLive) {
+        resetToCamera();
+      } else {
+        selectView.classList.remove('hidden');
+        // Redraw in case the viewport changed while the QR view was up.
+        drawTapTargets();
+      }
     };
 
     function resetToCamera() {
       qrView.classList.add('hidden');
       selectView.classList.add('hidden');
+      blurWarning.classList.add('hidden');
       overlay.parentElement.querySelectorAll('.tap-target').forEach(el => el.remove());
       cameraView.classList.remove('hidden');
       statusEl.textContent = 'Point at the text';
+      startLiveScan();
     }
 
     initCameras();
