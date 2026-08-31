@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BIOS Scanner</title>
     
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <!-- PaddleOCR and QR Code libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/paddleocr.js@1.0.0/dist/paddleocr.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
     <style>
@@ -88,37 +89,6 @@
         #corner-bl { bottom: 10px; left: 10px; border-right: none; border-top: none; border-bottom-left-radius: 10px; }
         #corner-br { bottom: 10px; right: 10px; border-left: none; border-top: none; border-bottom-right-radius: 10px; }
         
-        #cameraSelector {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            z-index: 20;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            padding: 5px;
-            max-width: 200px;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
-        
-        .camera-option {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            text-align: left;
-            font-size: 12px;
-            color: #333;
-            border-radius: 5px;
-        }
-        
-        .camera-option:hover { background: #f0f0f0; }
-        .camera-option.active { background: #e3f2fd; color: #007bff; font-weight: bold; }
-        
         #cameraStatus {
             position: absolute;
             bottom: 15px;
@@ -164,8 +134,6 @@
             justify-content: center;
         }
         
-        #zoomOut:active, #zoomIn:active { background: #007bff; color: white; }
-        
         #zoomSlider { flex: 1; accent-color: #007bff; height: 4px; }
         
         #zoomLevel {
@@ -194,12 +162,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
             flex-shrink: 0;
         }
-        
-        .icon-btn:active { background: #f0f0f0; transform: scale(0.95); }
-        .icon-btn.active { border-color: #007bff; background: #e3f2fd; }
         
         #shutterBtn {
             width: 70px;
@@ -227,8 +191,6 @@
             background: white;
             border: 3px solid #007bff;
         }
-        
-        #shutterBtn:active::after { background: #007bff; border-color: white; }
         
         #processing {
             position: fixed;
@@ -261,19 +223,19 @@
         
         #processingText { color: #333; font-size: 16px; font-weight: 500; }
         
-        #resultsScreen {
+        #selectionScreen {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: #f5f5f5;
+            background: white;
             display: none;
             flex-direction: column;
             z-index: 50;
         }
         
-        #resultsHeader {
+        #selectionHeader {
             flex-shrink: 0;
             padding: 15px;
             background: white;
@@ -283,7 +245,7 @@
             border-bottom: 2px solid #e0e0e0;
         }
         
-        #resultsHeader button {
+        #selectionHeader button {
             padding: 10px 15px;
             border: none;
             border-radius: 8px;
@@ -294,129 +256,118 @@
             cursor: pointer;
         }
         
-        #resultsContent {
+        #imageWrapper {
             flex: 1;
-            overflow-y: auto;
+            position: relative;
+            overflow: auto;
+            min-height: 0;
+            background: #f8f8f8;
+            padding: 15px;
+        }
+        
+        #imageContainer {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        #processedImage {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 8px;
+        }
+        
+        #textOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        .text-box {
+            position: absolute;
+            border: 2px solid #00ff00;
+            background: rgba(0, 255, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 20px;
+            border-radius: 3px;
+            pointer-events: auto;
+        }
+        
+        .text-box:active {
+            background: rgba(0, 255, 0, 0.4);
+        }
+        
+        #qrScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 60;
             padding: 20px;
         }
         
-        .detected-section {
+        #qrScreen h2 {
             margin-bottom: 20px;
-        }
-        
-        .detected-section h3 {
             color: #333;
-            margin-bottom: 10px;
-            font-size: 16px;
         }
         
-        .detected-item {
-            background: white;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 10px;
-            cursor: pointer;
-            border: 2px solid #e0e0e0;
-            transition: all 0.2s;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .detected-item:hover, .detected-item:active {
-            border-color: #007bff;
-            background: #f8f9ff;
-        }
-        
-        .detected-item.selected {
-            border-color: #007bff;
-            background: #e3f2fd;
-            box-shadow: 0 0 0 3px rgba(0,123,255,0.2);
-        }
-        
-        .detected-item .label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        
-        .detected-item .value {
+        #qrScreen .value-display {
             font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            word-break: break-all;
+            text-align: center;
+            max-width: 90%;
+        }
+        
+        #qrScreen canvas {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        #qrScreen .button-container {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        #qrScreen button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
             font-size: 16px;
             font-weight: bold;
-            color: #333;
-        }
-        
-        .all-text-section {
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-        }
-        
-        .all-text-section h3 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
-        
-        .text-lines {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .text-line {
-            padding: 10px;
-            margin-bottom: 5px;
-            background: #f8f8f8;
-            border-radius: 5px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            transition: all 0.2s;
+            min-width: 140px;
         }
         
-        .text-line:hover, .text-line:active {
-            background: #e3f2fd;
+        #qrScreen .choose-another {
+            background: #007bff;
+            color: white;
         }
         
-        .text-line.selected {
-            background: #e3f2fd;
-            border-left: 4px solid #007bff;
-        }
-        
-        #bottomPanel {
-            flex-shrink: 0;
-            background: white;
-            padding: 15px;
-            border-top: 2px solid #e0e0e0;
-        }
-        
-        #selectedText {
-            color: #333;
-            font-size: 16px;
-            font-family: monospace;
-            margin-bottom: 10px;
-            word-break: break-all;
-            padding: 10px;
-            background: #f8f8f8;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-        }
-        
-        #qrContainer {
-            display: none;
-            text-align: center;
-            margin-top: 10px;
-            padding: 15px;
-            background: white;
-            border-radius: 10px;
-            border: 2px solid #e0e0e0;
-        }
-        
-        #qrContainer canvas {
-            max-width: 150px;
-            height: auto;
+        #qrScreen .retake {
+            background: #28a745;
+            color: white;
         }
         
         #notification {
@@ -448,7 +399,6 @@
                 <div class="corner-marker" id="corner-tr"></div>
                 <div class="corner-marker" id="corner-bl"></div>
                 <div class="corner-marker" id="corner-br"></div>
-                <div id="cameraSelector"></div>
                 <div id="cameraStatus">Loading camera...</div>
             </div>
         </div>
@@ -462,9 +412,9 @@
             </div>
             
             <div id="buttonRow">
-                <button class="icon-btn" onclick="toggleCameraList()" title="Select Camera">📷</button>
-                <button id="shutterBtn" onclick="takePhoto()" title="Take Photo"></button>
                 <button class="icon-btn" onclick="toggleFlash()" title="Flash">⚡</button>
+                <button id="shutterBtn" onclick="takePhoto()" title="Take Photo"></button>
+                <button class="icon-btn" onclick="switchCamera()" title="Switch Camera">🔄</button>
             </div>
         </div>
     </div>
@@ -474,48 +424,66 @@
         <div id="processingText">Processing...</div>
     </div>
     
-    <div id="resultsScreen">
-        <div id="resultsHeader">
+    <div id="selectionScreen">
+        <div id="selectionHeader">
             <button onclick="retakePhoto()">📸 Retake</button>
-            <span style="color:#333; font-weight:bold;">Select Data</span>
-            <button onclick="clearSelection()">Clear</button>
+            <span style="color:#333; font-weight:bold;">Tap Text to Select</span>
+            <span></span>
         </div>
         
-        <div id="resultsContent">
-            <!-- Auto-detected items will appear here -->
-            <div class="detected-section" id="detectedItems"></div>
-            
-            <!-- All text lines fallback -->
-            <div class="all-text-section">
-                <h3>All Detected Text</h3>
-                <div class="text-lines" id="allTextLines"></div>
+        <div id="imageWrapper">
+            <div id="imageContainer">
+                <img id="processedImage" alt="Processed Image">
+                <div id="textOverlay"></div>
             </div>
         </div>
-        
-        <div id="bottomPanel">
-            <div id="selectedText">Tap on any value to select</div>
-            <div id="qrContainer">
-                <canvas id="qrCanvas"></canvas>
-            </div>
+    </div>
+    
+    <div id="qrScreen">
+        <h2>Scan QR Code</h2>
+        <div class="value-display" id="qrValueDisplay"></div>
+        <canvas id="qrCanvas"></canvas>
+        <div class="button-container">
+            <button class="choose-another" onclick="chooseAnother()">Choose Another Text</button>
+            <button class="retake" onclick="retakePhoto()">Retake Photo</button>
         </div>
     </div>
     
     <div id="notification"></div>
     
     <script>
-        // [Camera code stays the same as before - initCamera, listCameras, etc.]
         let video = document.getElementById('cameraFeed');
         let stream = null;
-        let cameras = [];
         let currentCameraIndex = -1;
+        let cameras = [];
         let flashOn = false;
         let currentZoom = 1;
+        let imageWidth = 0;
+        let imageHeight = 0;
+        let paddleOCR = null;
+        
+        // Initialize PaddleOCR
+        async function initPaddleOCR() {
+            try {
+                paddleOCR = new PaddleOCR({
+                    lang: 'en',
+                    det: true,
+                    rec: true,
+                    cls: false
+                });
+                await paddleOCR.init();
+                console.log('PaddleOCR initialized');
+            } catch (error) {
+                console.error('PaddleOCR init failed:', error);
+            }
+        }
         
         async function initCamera() {
             try {
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
+                
                 await listCameras(false);
                 await startCamera(currentCameraIndex);
             } catch (error) {
@@ -528,7 +496,7 @@
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 cameras = devices.filter(device => device.kind === 'videoinput');
-                if (showSelector) displayCameraSelector();
+                console.log('Found cameras:', cameras);
                 return cameras;
             } catch (error) {
                 console.error('List cameras error:', error);
@@ -536,42 +504,11 @@
             }
         }
         
-        function displayCameraSelector() {
-            const selector = document.getElementById('cameraSelector');
-            selector.innerHTML = '';
-            if (cameras.length === 0) {
-                selector.innerHTML = '<div style="padding:10px; color:#666;">No cameras found</div>';
-            } else {
-                cameras.forEach((camera, index) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'camera-option';
-                    if (index === currentCameraIndex) btn.classList.add('active');
-                    btn.textContent = camera.label || `Camera ${index + 1}`;
-                    btn.onclick = () => switchToCamera(index);
-                    selector.appendChild(btn);
-                });
-            }
-            selector.style.display = 'block';
-        }
-        
-        function toggleCameraList() {
-            const selector = document.getElementById('cameraSelector');
-            if (selector.style.display === 'none' || selector.style.display === '') {
-                displayCameraSelector();
-            } else {
-                selector.style.display = 'none';
-            }
-        }
-        
-        async function switchToCamera(index) {
-            currentCameraIndex = index;
-            await startCamera(index);
-            document.getElementById('cameraSelector').style.display = 'none';
-        }
-        
         async function startCamera(index) {
             try {
-                if (stream) stream.getTracks().forEach(track => track.stop());
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
                 
                 let constraints;
                 if (index >= 0 && cameras[index]) {
@@ -608,13 +545,20 @@
             } catch (error) {
                 console.error('Start camera error:', error);
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'environment' } 
+                    });
                     video.srcObject = stream;
                     document.getElementById('cameraStatus').textContent = '📷 Camera';
                 } catch (fallbackError) {
                     document.getElementById('cameraStatus').textContent = '❌ Camera failed';
                 }
             }
+        }
+        
+        async function switchCamera() {
+            currentCameraIndex = (currentCameraIndex + 1) % Math.max(cameras.length, 1);
+            await startCamera(currentCameraIndex);
         }
         
         async function toggleFlash() {
@@ -624,7 +568,9 @@
                     const capabilities = track.getCapabilities();
                     if (capabilities.torch) {
                         flashOn = !flashOn;
-                        await track.applyConstraints({ advanced: [{ torch: flashOn }] });
+                        await track.applyConstraints({
+                            advanced: [{ torch: flashOn }]
+                        });
                         showNotification(flashOn ? 'Flash ON' : 'Flash OFF');
                     } else {
                         showNotification('No flash on this camera');
@@ -646,7 +592,9 @@
                     const track = stream.getVideoTracks()[0];
                     const capabilities = track.getCapabilities();
                     if (capabilities.zoom) {
-                        await track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+                        await track.applyConstraints({
+                            advanced: [{ zoom: currentZoom }]
+                        });
                     } else {
                         video.style.transform = `scale(${currentZoom})`;
                     }
@@ -669,13 +617,10 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0);
                 
-                document.getElementById('processingText').textContent = 'Processing...';
-                const processedCanvas = await processImage(canvas);
+                document.getElementById('processingText').textContent = 'Processing with PaddleOCR...';
+                const results = await runPaddleOCR(canvas);
                 
-                document.getElementById('processingText').textContent = 'Reading text...';
-                const ocrText = await runOCR(processedCanvas);
-                
-                showResults(ocrText);
+                showSelectionScreen(canvas, results);
                 
                 document.getElementById('processing').style.display = 'none';
             } catch (error) {
@@ -685,208 +630,139 @@
             }
         }
         
-        async function processImage(canvas) {
-            const scale = 2;
-            const upscaled = document.createElement('canvas');
-            upscaled.width = canvas.width * scale;
-            upscaled.height = canvas.height * scale;
-            const upCtx = upscaled.getContext('2d');
-            upCtx.imageSmoothingEnabled = true;
-            upCtx.imageSmoothingQuality = 'high';
-            upCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, upscaled.width, upscaled.height);
-            
-            const imageData = upCtx.getImageData(0, 0, upscaled.width, upscaled.height);
-            const data = imageData.data;
-            
-            for (let i = 0; i < data.length; i += 4) {
-                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                const contrast = 1.2;
-                const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
-                const enhanced = factor * (gray - 128) + 128;
-                const clamped = Math.max(0, Math.min(255, enhanced));
-                data[i] = clamped;
-                data[i + 1] = clamped;
-                data[i + 2] = clamped;
-            }
-            
-            upCtx.putImageData(imageData, 0, 0);
-            return upscaled;
-        }
-        
-        async function runOCR(canvas) {
+        async function runPaddleOCR(canvas) {
             try {
-                const result = await Tesseract.recognize(canvas, 'eng', {
-                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
-                    tessedit_pageseg_mode: '6',
-                    preserve_interword_spaces: '1',
-                    tessedit_ocr_engine_mode: '2'
-                });
+                if (!paddleOCR) {
+                    await initPaddleOCR();
+                }
                 
-                return result.data.text;
+                // Convert canvas to image data
+                const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                
+                // Run PaddleOCR
+                const results = await paddleOCR.recognize(imageData);
+                
+                console.log('PaddleOCR results:', results);
+                
+                return results;
             } catch (error) {
-                console.error('OCR error:', error);
-                return '';
+                console.error('PaddleOCR error:', error);
+                return null;
             }
         }
         
-        function showResults(ocrText) {
+        function showSelectionScreen(canvas, ocrResults) {
+            imageWidth = canvas.width;
+            imageHeight = canvas.height;
+            
             document.getElementById('app').style.display = 'none';
-            document.getElementById('resultsScreen').style.display = 'flex';
+            document.getElementById('selectionScreen').style.display = 'flex';
             
-            // Clear previous content
-            document.getElementById('detectedItems').innerHTML = '';
-            document.getElementById('allTextLines').innerHTML = '';
+            const img = document.getElementById('processedImage');
+            img.src = canvas.toDataURL();
             
-            // Auto-detect serial numbers and MAC addresses
-            const detected = autoDetect(ocrText);
-            
-            // Display auto-detected items
-            const detectedHTML = [];
-            
-            if (detected.serialNumbers.length > 0) {
-                detectedHTML.push('<h3>🔢 Serial Numbers</h3>');
-                detected.serialNumbers.forEach(serial => {
-                    detectedHTML.push(`
-                        <div class="detected-item" onclick="selectText('${serial}', this)">
-                            <div>
-                                <div class="label">Serial Number</div>
-                                <div class="value">${serial}</div>
-                            </div>
-                            <span>→</span>
-                        </div>
-                    `);
-                });
-            }
-            
-            if (detected.macAddresses.length > 0) {
-                detectedHTML.push('<h3>🌐 MAC Addresses</h3>');
-                detected.macAddresses.forEach(mac => {
-                    detectedHTML.push(`
-                        <div class="detected-item" onclick="selectText('${mac}', this)">
-                            <div>
-                                <div class="label">MAC Address</div>
-                                <div class="value">${mac}</div>
-                            </div>
-                            <span>→</span>
-                        </div>
-                    `);
-                });
-            }
-            
-            if (detectedHTML.length === 0) {
-                detectedHTML.push('<p style="color:#666; text-align:center;">No serial numbers or MAC addresses detected automatically</p>');
-            }
-            
-            document.getElementById('detectedItems').innerHTML = detectedHTML.join('');
-            
-            // Display all text lines as fallback
-            const lines = ocrText.split('\n').filter(line => line.trim().length > 0);
-            lines.forEach(line => {
-                const div = document.createElement('div');
-                div.className = 'text-line';
-                div.textContent = line.trim();
-                div.onclick = () => selectText(line.trim(), div);
-                document.getElementById('allTextLines').appendChild(div);
-            });
-        }
-        
-        function autoDetect(text) {
-            const results = {
-                serialNumbers: [],
-                macAddresses: []
+            img.onload = () => {
+                document.getElementById('textOverlay').innerHTML = '';
+                
+                if (ocrResults && ocrResults.texts && ocrResults.texts.length > 0) {
+                    createTextBoxes(ocrResults);
+                } else {
+                    showNotification('No text detected. Try again.');
+                }
             };
-            
-            // Detect serial numbers (7+ alphanumeric characters)
-            const serialPatterns = [
-                /(?:serial|s\/n|service tag)[:\s]*([A-Z0-9]{7,})/gi,
-                /\b([A-Z0-9]{7,})\b/g
-            ];
-            
-            serialPatterns.forEach(pattern => {
-                const matches = text.match(pattern);
-                if (matches) {
-                    matches.forEach(match => {
-                        const clean = match.replace(/(?:serial|s\/n|service tag)[:\s]*/gi, '').trim();
-                        if (clean.length >= 7 && /[A-Z]/.test(clean) && /\d/.test(clean)) {
-                            if (!results.serialNumbers.includes(clean)) {
-                                results.serialNumbers.push(clean);
-                            }
-                        }
-                    });
-                }
-            });
-            
-            // Detect MAC addresses
-            const macPattern = /\b([0-9A-F]{2}[:-]){5}[0-9A-F]{2}\b/gi;
-            const macMatches = text.match(macPattern);
-            if (macMatches) {
-                macMatches.forEach(mac => {
-                    const cleanMac = mac.toUpperCase();
-                    if (!results.macAddresses.includes(cleanMac)) {
-                        results.macAddresses.push(cleanMac);
-                    }
-                });
-            }
-            
-            return results;
         }
         
-        async function selectText(text, element) {
+        function createTextBoxes(ocrResults) {
+            const overlay = document.getElementById('textOverlay');
+            
+            ocrResults.texts.forEach((item, index) => {
+                if (!item.text || item.text.trim().length < 1) return;
+                
+                const box = document.createElement('div');
+                box.className = 'text-box';
+                
+                // PaddleOCR provides points array [x1,y1,x2,y2,x3,y3,x4,y4]
+                const points = item.points || [];
+                let left, top, width, height;
+                
+                if (points.length === 8) {
+                    // Calculate bounding box from points
+                    const xs = [points[0], points[2], points[4], points[6]];
+                    const ys = [points[1], points[3], points[5], points[7]];
+                    const minX = Math.min(...xs);
+                    const maxX = Math.max(...xs);
+                    const minY = Math.min(...ys);
+                    const maxY = Math.max(...ys);
+                    
+                    left = (minX / imageWidth) * 100;
+                    top = (minY / imageHeight) * 100;
+                    width = ((maxX - minX) / imageWidth) * 100;
+                    height = ((maxY - minY) / imageHeight) * 100;
+                } else {
+                    // Fallback - skip if no coordinates
+                    return;
+                }
+                
+                box.style.left = left + '%';
+                box.style.top = top + '%';
+                box.style.width = Math.max(width, 2) + '%';
+                box.style.height = Math.max(height, 2) + '%';
+                box.style.minHeight = '15px';
+                
+                const cleanText = item.text.trim();
+                box.dataset.text = cleanText;
+                box.title = cleanText;
+                
+                box.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showQRCode(cleanText);
+                });
+                
+                overlay.appendChild(box);
+            });
+        }
+        
+        async function showQRCode(text) {
+            const cleanText = text.trim();
+            if (!cleanText) return;
+            
+            // Show QR screen
+            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('qrScreen').style.display = 'flex';
+            
+            // Display the selected text
+            document.getElementById('qrValueDisplay').textContent = cleanText;
+            
+            // Generate QR code
+            const qrCanvas = document.getElementById('qrCanvas');
+            await QRCode.toCanvas(qrCanvas, cleanText, {
+                width: 300,
+                margin: 2,
+                errorCorrectionLevel: 'H'
+            });
+            
+            // Copy to clipboard
             try {
-                const cleanText = text.trim();
-                if (!cleanText) return;
-                
-                document.getElementById('selectedText').textContent = cleanText;
-                
-                // Remove previous selections
-                document.querySelectorAll('.detected-item, .text-line').forEach(el => {
-                    el.classList.remove('selected');
-                });
-                
-                if (element) {
-                    element.classList.add('selected');
-                }
-                
-                // Generate QR code
-                const qrContainer = document.getElementById('qrContainer');
-                qrContainer.style.display = 'block';
-                
-                const qrCanvas = document.getElementById('qrCanvas');
-                await QRCode.toCanvas(qrCanvas, cleanText, {
-                    width: 100,
-                    margin: 2,
-                    errorCorrectionLevel: 'H'
-                });
-                
-                // Copy to clipboard
-                try {
-                    await navigator.clipboard.writeText(cleanText);
-                    showNotification('Copied: ' + cleanText);
-                } catch (err) {
-                    // Clipboard might not work
-                }
-                
-                if (navigator.vibrate) {
-                    navigator.vibrate(50);
-                }
-            } catch (error) {
-                console.error('Selection error:', error);
+                await navigator.clipboard.writeText(cleanText);
+                showNotification('Copied to clipboard!');
+            } catch (err) {
+                // Clipboard might not work
             }
         }
         
-        function clearSelection() {
-            document.getElementById('selectedText').textContent = 'Tap on any value to select';
-            document.getElementById('qrContainer').style.display = 'none';
-            document.querySelectorAll('.detected-item, .text-line').forEach(el => {
-                el.classList.remove('selected');
-            });
+        function chooseAnother() {
+            document.getElementById('qrScreen').style.display = 'none';
+            document.getElementById('selectionScreen').style.display = 'flex';
         }
         
         function retakePhoto() {
-            document.getElementById('resultsScreen').style.display = 'none';
+            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('qrScreen').style.display = 'none';
             document.getElementById('app').style.display = 'flex';
-            clearSelection();
-            setTimeout(() => initCamera(), 100);
+            
+            setTimeout(() => {
+                initCamera();
+            }, 100);
         }
         
         function showNotification(message) {
@@ -899,6 +775,7 @@
         }
         
         window.addEventListener('DOMContentLoaded', () => {
+            initPaddleOCR();
             initCamera();
         });
     </script>
