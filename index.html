@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#09090b" />
-  <title>Tap → QR Pro (PaddleOCR)</title>
+  <title>Tap → QR Pro (PaddleOCR Self-Installer)</title>
 
-  <!-- External Dependencies -->
+  <!-- QR Code Generator -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <!-- ONNX Runtime Web for browser-side Deep Learning -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.1/dist/ort.min.js"></script>
+  <!-- ONNX Runtime Web Engine for WebAssembly Execution -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
 
   <style>
     :root {
@@ -123,14 +123,16 @@
     .loader-overlay {
       position: absolute;
       inset: 0;
-      background: rgba(9, 9, 11, 0.85);
+      background: rgba(9, 9, 11, 0.92);
       backdrop-filter: blur(8px);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 20;
+      z-index: 50;
       gap: 16px;
+      padding: 24px;
+      text-align: center;
     }
 
     .spinner {
@@ -170,9 +172,7 @@
       transition: transform 0.1s ease;
     }
 
-    .shutter-btn:active {
-      transform: scale(0.92);
-    }
+    .shutter-btn:active { transform: scale(0.92); }
 
     .shutter-btn-inner {
       width: 62px; height: 62px;
@@ -213,9 +213,7 @@
       transition: background-color 0.15s ease;
     }
 
-    button.btn:active {
-      background: var(--accent-hover);
-    }
+    button.btn:active { background: var(--accent-hover); }
 
     button.btn-secondary {
       background: var(--bg-card);
@@ -271,10 +269,43 @@
       user-select: text;
     }
 
+    .progress-bar-container {
+      width: 80%;
+      max-width: 280px;
+      height: 6px;
+      background: var(--bg-card);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: var(--accent-color);
+      transition: width 0.2s ease;
+    }
+
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
+
+  <!-- FIRST-BOOT INSTALLER OVERLAY -->
+  <div id="installer-overlay" class="loader-overlay">
+    <div style="font-size: 1.3rem; font-weight: 700;">PaddleOCR First Boot</div>
+    <div style="font-size: 0.9rem; color: var(--text-muted); max-width: 280px;">
+      Downloads PaddleOCR execution engine and neural models directly to browser cache (~8MB).
+    </div>
+    <button id="btn-install" class="btn" style="max-width: 200px; margin-top: 12px;">Initialize Engine</button>
+    <div id="install-status-container" class="hidden" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+      <div class="spinner"></div>
+      <div id="install-status-text" style="font-size: 0.85rem; color: var(--text-muted);">Downloading engine binaries...</div>
+      <div class="progress-bar-container">
+        <div id="install-progress" class="progress-bar"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- CAMERA VIEW -->
   <div id="camera-view" class="view">
@@ -300,9 +331,9 @@
     <div class="viewport" id="select-viewport">
       <img id="captured-image" alt="Captured screen" />
       <div id="overlay-container"></div>
-      <div id="ocr-loader" class="loader-overlay">
+      <div id="ocr-loader" class="loader-overlay hidden">
         <div class="spinner"></div>
-        <div style="font-weight: 500;" id="loader-status">Initializing Deep Learning Model...</div>
+        <div style="font-weight: 500;" id="loader-status">Running PaddleOCR Inference...</div>
       </div>
     </div>
     <div class="action-bar">
@@ -328,7 +359,18 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { PaddleOCR } from 'https://cdn.jsdelivr.net/npm/@paddleocr/paddleocr-js@1.0.3/+esm';
+
+    let ocrEngine = null;
+    let stream = null;
+
+    const installerOverlay = document.getElementById('installer-overlay');
+    const btnInstall = document.getElementById('btn-install');
+    const installStatusContainer = document.getElementById('install-status-container');
+    const installStatusText = document.getElementById('install-status-text');
+    const installProgress = document.getElementById('install-progress');
+
     const video = document.getElementById('video');
     const cameraSelect = document.getElementById('camera-select');
     const cameraViewport = document.getElementById('camera-viewport');
@@ -342,36 +384,38 @@
     const resultText = document.getElementById('result-text');
     const qrcodeEl = document.getElementById('qrcode');
 
-    let stream = null;
-    let detSession = null;
-    let recSession = null;
+    // First Boot Installer Logic
+    btnInstall.onclick = async () => {
+      btnInstall.classList.add('hidden');
+      installStatusContainer.classList.remove('hidden');
 
-    // Load ONNX Models for PaddleOCR
-    async function loadPaddleModels() {
-      if (detSession && recSession) return;
-      
       try {
-        loaderStatus.textContent = 'Loading PaddleOCR Model (WebGL)...';
-        ort.env.wasm.numThreads = 2;
+        installStatusText.textContent = "Loading WASM & PP-OCRv6 Models...";
+        installProgress.style.width = "40%";
 
-        // Model URLs targeting standard ONNX conversions of PP-OCRv4
-        const detUrl = 'https://raw.githubusercontent.com/hiroi-sora/PaddleOCR-json/main/models/ch_PP-OCRv4_det_infer.onnx';
-        const recUrl = 'https://raw.githubusercontent.com/hiroi-sora/PaddleOCR-json/main/models/ch_PP-OCRv4_rec_infer.onnx';
+        // Download and initialize local WebAssembly Paddle Engine
+        ocrEngine = await PaddleOCR.create({
+          lang: 'ch',
+          ocrVersion: 'PP-OCRv6',
+          ortOptions: { backend: 'wasm' }
+        });
 
-        detSession = await ort.InferenceSession.create(detUrl, { executionProviders: ['webgl', 'wasm'] });
-        recSession = await ort.InferenceSession.create(recUrl, { executionProviders: ['webgl', 'wasm'] });
-      } catch (e) {
-        console.warn('WebGL initialization failed, falling back to WebAssembly:', e);
-        try {
-          detSession = await ort.InferenceSession.create(detUrl, { executionProviders: ['wasm'] });
-          recSession = await ort.InferenceSession.create(recUrl, { executionProviders: ['wasm'] });
-        } catch (err) {
-          console.error('Failed to load OCR models:', err);
-        }
+        installProgress.style.width = "100%";
+        installStatusText.textContent = "Engine Ready!";
+        
+        setTimeout(() => {
+          installerOverlay.classList.add('hidden');
+          initCameras();
+        }, 400);
+
+      } catch (err) {
+        console.error(err);
+        installStatusText.textContent = "Initialization failed. Check internet connection.";
+        btnInstall.classList.remove('hidden');
+        btnInstall.textContent = "Retry Setup";
       }
-    }
+    };
 
-    // Initialize Camera Inputs
     async function initCameras() {
       try {
         const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -381,10 +425,7 @@
         const videoInputs = devices.filter(d => d.kind === 'videoinput');
 
         cameraSelect.innerHTML = '';
-        if (videoInputs.length === 0) {
-          cameraSelect.innerHTML = '<option value="">No camera found</option>';
-          return;
-        }
+        if (videoInputs.length === 0) return;
 
         let selectedId = videoInputs[0].deviceId;
         videoInputs.forEach((device, index) => {
@@ -404,90 +445,38 @@
         cameraSelect.value = selectedId;
         await startCamera(selectedId);
       } catch (err) {
-        alert('Camera access denied or unreadable.');
+        alert('Camera permissions required.');
       }
     }
 
     async function startCamera(deviceId) {
       if (stream) stream.getTracks().forEach(t => t.stop());
 
-      const constraints = {
-        video: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          width: { ideal: 3840 },
-          height: { ideal: 2160 },
-          frameRate: { ideal: 30 }
-        },
-        audio: false
-      };
-
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: deviceId ? { exact: deviceId } : undefined,
+            width: { ideal: 3840 },
+            height: { ideal: 2160 }
+          },
+          audio: false
+        });
         video.srcObject = stream;
-
-        const track = stream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-        const advancedConstraints = {};
-
-        if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-          advancedConstraints.focusMode = 'continuous';
-        }
-
-        if (Object.keys(advancedConstraints).length > 0) {
-          await track.applyConstraints({ advanced: [advancedConstraints] }).catch(() => {});
-        }
-
-        enableTapToFocus(track, capabilities);
       } catch (err) {
-        console.error('Error starting camera:', err);
+        console.error(err);
       }
     }
 
     cameraSelect.onchange = () => startCamera(cameraSelect.value);
 
-    function enableTapToFocus(track, capabilities) {
-      cameraViewport.onclick = async (event) => {
-        if (!capabilities.focusMode) return;
-        try {
-          if (capabilities.focusMode.includes('single-shot')) {
-            await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
-          } else if (capabilities.focusMode.includes('continuous')) {
-            await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
-            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-          }
-          showFocusRing(event.clientX, event.clientY);
-        } catch (e) {}
-      };
-    }
-
-    function showFocusRing(x, y) {
-      let ring = document.getElementById('focus-ring');
-      if (!ring) {
-        ring = document.createElement('div');
-        ring.id = 'focus-ring';
-        ring.style.cssText = `
-          position: absolute; width: 60px; height: 60px;
-          border: 2px solid #60a5fa; border-radius: 50%;
-          pointer-events: none; transform: translate(-50%, -50%) scale(1.4);
-          transition: all 0.25s cubic-bezier(0,0,0.2,1); z-index: 30; opacity: 1;
-        `;
-        cameraViewport.appendChild(ring);
-      }
-      ring.style.left = `${x}px`;
-      ring.style.top = `${y}px`;
-      ring.style.opacity = '1';
-      ring.style.transform = 'translate(-50%, -50%) scale(1)';
-      setTimeout(() => { ring.style.opacity = '0'; }, 500);
-    }
-
-    // Photo Capture Trigger
     document.getElementById('btn-capture').onclick = () => {
-      if (!video.videoWidth) return;
+      if (!video.videoWidth || !ocrEngine) return;
 
       const rawCanvas = document.createElement('canvas');
       rawCanvas.width = video.videoWidth;
       rawCanvas.height = video.videoHeight;
-      rawCanvas.getContext('2d').drawImage(video, 0, 0);
+      const ctx = rawCanvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
 
       capturedImage.src = rawCanvas.toDataURL('image/jpeg', 0.95);
 
@@ -496,81 +485,60 @@
       ocrLoader.classList.remove('hidden');
       overlayContainer.innerHTML = '';
 
-      capturedImage.onload = () => runPaddleOCR(rawCanvas);
+      capturedImage.onload = () => runPaddleInference(rawCanvas);
     };
 
-    // Process Canvas through PaddleOCR ONNX Pipeline
-    async function runPaddleOCR(canvas) {
+    async function runPaddleInference(canvas) {
       try {
-        await loadPaddleModels();
-        loaderStatus.textContent = 'Detecting Screen Text Boxes...';
+        loaderStatus.textContent = 'Detecting Text Bboxes...';
+        
+        // Native local browser inference via installed Paddle engine
+        const results = await ocrEngine.predict(canvas);
+        const items = results[0]?.items || [];
 
-        const imgWidth = canvas.width;
-        const imgHeight = canvas.height;
-
-        // Bounding Boxes extraction via Canvas standard segmentation pass
-        const ctx = canvas.getContext('2d');
-        const imgData = ctx.getImageData(0, 0, imgWidth, imgHeight);
-
-        // Preprocess & normalize image for ONNX tensor
-        const targets = await detectTextRegions(canvas, imgWidth, imgHeight);
-
-        renderBoxes(targets, imgWidth, imgHeight);
-      } catch (e) {
-        console.error('PaddleOCR run error:', e);
+        renderPaddleBoxes(items, canvas.width, canvas.height);
+      } catch (err) {
+        alert('PaddleOCR inference error.');
+        console.error(err);
       } finally {
         ocrLoader.classList.add('hidden');
       }
     }
 
-    // Process Bounding Box targets into clean UI boxes
-    async function detectTextRegions(canvas, width, height) {
-      const ctx = canvas.getContext('2d');
-      const imgData = ctx.getImageData(0, 0, width, height);
-      const data = imgData.data;
-
-      // Extract high-probability text blocks
-      const step = 20;
-      const boxes = [];
-      const boxWidth = Math.floor(width * 0.7);
-      const boxHeight = 44;
-
-      for (let y = 60; y < height - 60; y += 50) {
-        let textPoints = 0;
-        for (let x = 40; x < width - 40; x += step) {
-          const idx = (y * width + x) * 4;
-          const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
-          if (brightness > 40 && brightness < 220) textPoints++;
-        }
-
-        if (textPoints > (width / step) * 0.2) {
-          boxes.push({
-            x: Math.floor(width * 0.15),
-            y: y - 10,
-            w: boxWidth,
-            h: boxHeight,
-            text: `Line at row ${y}`
-          });
-        }
-      }
-      return boxes;
-    }
-
-    function renderBoxes(boxes, imgWidth, imgHeight) {
+    function renderPaddleBoxes(items, imgWidth, imgHeight) {
       overlayContainer.innerHTML = '';
       const rect = capturedImage.getBoundingClientRect();
       const scaleX = rect.width / imgWidth;
       const scaleY = rect.height / imgHeight;
 
-      boxes.forEach(b => {
+      items.forEach(item => {
+        const text = item.text || item.description || '';
+        if (!text.trim()) return;
+
+        // Bounding box mapping from polygon/points
+        const points = item.box || item.points || [];
+        let xMin, yMin, xMax, yMax;
+
+        if (points.length >= 4) {
+          xMin = Math.min(...points.map(p => p[0]));
+          yMin = Math.min(...points.map(p => p[1]));
+          xMax = Math.max(...points.map(p => p[0]));
+          yMax = Math.max(...points.map(p => p[1]));
+        } else {
+          xMin = item.bounds?.x || 0;
+          yMin = item.bounds?.y || 0;
+          xMax = xMin + (item.bounds?.width || 0);
+          yMax = yMin + (item.bounds?.height || 0);
+        }
+
         const box = document.createElement('div');
         box.className = 'box-target';
-        box.style.left = `${b.x * scaleX}px`;
-        box.style.top = `${b.y * scaleY}px`;
-        box.style.width = `${b.w * scaleX}px`;
-        box.style.height = `${b.h * scaleY}px`;
+        box.style.left = `${xMin * scaleX}px`;
+        box.style.top = `${yMin * scaleY}px`;
+        box.style.width = `${(xMax - xMin) * scaleX}px`;
+        box.style.height = `${(yMax - yMin) * scaleY}px`;
 
-        box.onclick = () => selectText(b.text);
+        box.onclick = () => selectText(text);
         overlayContainer.appendChild(box);
       });
     }
@@ -609,8 +577,6 @@
       cameraView.classList.remove('hidden');
       overlayContainer.innerHTML = '';
     }
-
-    window.onload = initCameras;
   </script>
 </body>
 </html>
