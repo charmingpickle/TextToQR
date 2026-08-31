@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#09090b" />
-  <title>Tap → QR</title>
+  <title>Tap → QR Pro</title>
 
   <!-- External Dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -27,7 +27,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg-main);
       color: var(--text-main);
       min-height: 100dvh;
@@ -46,7 +46,6 @@
       overflow: hidden;
     }
 
-    /* --- Viewport & Camera Layout --- */
     .viewport {
       flex: 1;
       position: relative;
@@ -63,22 +62,46 @@
       object-fit: contain;
     }
 
-    /* Framing Guide Overlay */
+    /* Top Camera Selection Bar */
+    .top-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 15;
+      display: flex;
+      justify-content: center;
+    }
+
+    .camera-select {
+      background: rgba(24, 24, 27, 0.85);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      backdrop-filter: blur(10px);
+      outline: none;
+      max-width: 90%;
+      text-overflow: ellipsis;
+    }
+
+    /* Framing Reticle */
     .view-finder {
       position: absolute;
       width: 80%;
-      height: 50%;
+      height: 45%;
       border: 2px dashed rgba(255, 255, 255, 0.4);
       border-radius: 16px;
       pointer-events: none;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .view-finder::after {
-      content: "Align screen text inside box";
+      content: "Hold steady near monitor text";
       color: rgba(255, 255, 255, 0.7);
       font-size: 0.8rem;
       font-weight: 600;
@@ -90,7 +113,7 @@
       backdrop-filter: blur(4px);
     }
 
-    /* Target Interactive Box Overlays */
+    /* Bounding Box Targets */
     #overlay-container {
       position: absolute;
       top: 0; left: 0;
@@ -105,16 +128,16 @@
       border-radius: 4px;
       cursor: pointer;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-      transition: transform 0.1s ease, background-color 0.15s ease;
+      transition: transform 0.1s ease;
     }
 
     .box-target:active {
-      transform: scale(0.96);
-      background: rgba(59, 130, 246, 0.65);
+      transform: scale(0.95);
+      background: rgba(59, 130, 246, 0.7);
       border-color: #ffffff;
     }
 
-    /* Loading Spinner Overlay */
+    /* Loading Overlay */
     .loader-overlay {
       position: absolute;
       inset: 0;
@@ -141,13 +164,13 @@
       to { transform: rotate(360deg); }
     }
 
-    /* Controls Header & Footer */
+    /* Control Bar */
     .control-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
       padding: 24px 32px 40px;
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
       background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
       z-index: 10;
@@ -176,25 +199,7 @@
       background: #fff;
     }
 
-    .icon-btn {
-      width: 48px; height: 48px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      font-size: 1.2rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-
-    .icon-btn:active {
-      background: rgba(255,255,255,0.3);
-    }
-
-    /* Selection & QR Display Styles */
+    /* Header & UI Buttons */
     .view-header {
       padding: 18px 20px;
       background: var(--bg-surface);
@@ -225,7 +230,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
       transition: background-color 0.15s ease;
     }
 
@@ -239,11 +243,7 @@
       border: 1px solid var(--border-color);
     }
 
-    button.btn-secondary:active {
-      background: var(--border-color);
-    }
-
-    /* Output QR Section */
+    /* Output QR View */
     #qr-container-view {
       flex: 1;
       overflow-y: auto;
@@ -260,9 +260,6 @@
       padding: 20px;
       border-radius: 20px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
     .text-editor-card {
@@ -302,28 +299,31 @@
 
   <!-- CAMERA VIEW -->
   <div id="camera-view" class="view">
+    <div class="top-bar">
+      <select id="camera-select" class="camera-select">
+        <option value="">Detecting cameras...</option>
+      </select>
+    </div>
     <div class="viewport">
       <video id="video" autoplay playsinline muted></video>
       <div class="view-finder"></div>
     </div>
     <div class="control-bar">
-      <button class="icon-btn" id="btn-switch" aria-label="Switch Camera">⟳</button>
       <button class="shutter-btn" id="btn-capture" aria-label="Take Photo">
         <div class="shutter-btn-inner"></div>
       </button>
-      <div style="width: 48px;"></div>
     </div>
   </div>
 
   <!-- SELECT VIEW -->
   <div id="select-view" class="view hidden">
     <div class="view-header">Tap text box to convert to QR</div>
-    <div class="viewport" id="select-viewport">
+    <div class="viewport">
       <img id="captured-image" alt="Captured screen" />
       <div id="overlay-container"></div>
       <div id="ocr-loader" class="loader-overlay">
         <div class="spinner"></div>
-        <div style="font-weight: 500;">Filtering Screen Banding & Reading...</div>
+        <div style="font-weight: 500;" id="loader-status">Processing Screen Text...</div>
       </div>
     </div>
     <div class="action-bar">
@@ -351,181 +351,186 @@
 
   <script>
     const video = document.getElementById('video');
+    const cameraSelect = document.getElementById('camera-select');
     const cameraView = document.getElementById('camera-view');
     const selectView = document.getElementById('select-view');
     const qrView = document.getElementById('qr-view');
     const capturedImage = document.getElementById('captured-image');
     const overlayContainer = document.getElementById('overlay-container');
     const ocrLoader = document.getElementById('ocr-loader');
+    const loaderStatus = document.getElementById('loader-status');
     const resultText = document.getElementById('result-text');
     const qrcodeEl = document.getElementById('qrcode');
 
     let stream = null;
-    let videoDevices = [];
-    let currentDeviceIdx = 0;
     let tesseractWorker = null;
 
-    // Direct Primary Camera Selection
-    async function initApp() {
+    // --- 1. DIRECT CAMERA SELECTION INITIALIZATION ---
+    async function initCameras() {
       try {
-        // Force initial MediaStream permission request
-        const initialStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        initialStream.getTracks().forEach(t => t.stop());
+        // Request permissions first to unlock camera labels
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        tempStream.getTracks().forEach(t => t.stop());
 
         const devices = await navigator.mediaDevices.enumerateDevices();
-        videoDevices = devices.filter(d => d.kind === 'videoinput');
+        const videoInputs = devices.filter(d => d.kind === 'videoinput');
 
-        // Locate main environment rear camera index (filtering out wide/macro/front)
-        let primaryIdx = videoDevices.findIndex(d => {
-          const label = d.label.toLowerCase();
-          return (label.includes('back') || label.includes('rear') || label.includes('environment')) 
-                 && !label.includes('wide') && !label.includes('ultra') && !label.includes('macro');
+        cameraSelect.innerHTML = '';
+        if (videoInputs.length === 0) {
+          cameraSelect.innerHTML = '<option value="">No camera found</option>';
+          return;
+        }
+
+        // Auto-select best rear camera candidate
+        let selectedId = videoInputs[0].deviceId;
+        videoInputs.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.deviceId;
+          const label = device.label || `Camera ${index + 1}`;
+          option.textContent = label;
+
+          // Target primary rear camera (excluding ultra-wide/macro where possible)
+          const l = label.toLowerCase();
+          if ((l.includes('back') || l.includes('rear') || l.includes('environment')) &&
+              !l.includes('wide') && !l.includes('ultra') && !l.includes('macro')) {
+            selectedId = device.deviceId;
+          }
+          cameraSelect.appendChild(option);
         });
 
-        if (primaryIdx === -1) {
-          primaryIdx = videoDevices.findIndex(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear'));
-        }
-        
-        currentDeviceIdx = primaryIdx !== -1 ? primaryIdx : 0;
-        await startSelectedCamera();
-      } catch (e) {
-        alert('Camera permission is required.');
+        cameraSelect.value = selectedId;
+        await startCamera(selectedId);
+      } catch (err) {
+        alert('Camera access denied or unreadable.');
       }
     }
 
-    async function startSelectedCamera() {
+    async function startCamera(deviceId) {
       if (stream) stream.getTracks().forEach(t => t.stop());
 
-      const selectedDevice = videoDevices[currentDeviceIdx];
       const constraints = {
         video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
           width: { ideal: 3840 },
-          height: { ideal: 2160 },
-          ...(selectedDevice ? { deviceId: { exact: selectedDevice.deviceId } } : { facingMode: { ideal: 'environment' } })
+          height: { ideal: 2160 }
         },
         audio: false
       };
 
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      video.srcObject = stream;
-
-      const track = stream.getVideoTracks()[0];
       try {
-        const caps = track.getCapabilities?.();
-        if (caps?.focusMode?.includes('continuous')) {
-          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-        }
-      } catch (e) {}
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+
+        // Apply Focus & Zoom Hardware Constraints
+        const track = stream.getVideoTracks()[0];
+        const caps = track.getCapabilities?.() || {};
+        const advanced = [];
+        if (caps.focusMode?.includes('continuous')) advanced.push({ focusMode: 'continuous' });
+        if (advanced.length) await track.applyConstraints({ advanced }).catch(() => {});
+      } catch (err) {
+        console.error('Error opening selected camera', err);
+      }
     }
 
-    document.getElementById('btn-switch').onclick = () => {
-      if (videoDevices.length < 2) return;
-      currentDeviceIdx = (currentDeviceIdx + 1) % videoDevices.length;
-      startSelectedCamera();
-    };
+    cameraSelect.onchange = () => startCamera(cameraSelect.value);
 
-    // Advanced Screen Capture Preprocessing Pipeline (Moiré Filter + Sauvola Binarization)
-    function preprocessScreenImage(sourceCanvas) {
-      const maxDim = 2000;
-      let width = sourceCanvas.width;
-      let height = sourceCanvas.height;
+    // --- 2. MULTI-PASS PREPROCESSING PIPELINE ---
+    function generatePasses(sourceCanvas) {
+      const maxDim = 1800; // Optimal scaling for Tesseract DPI target
+      let w = sourceCanvas.width;
+      let h = sourceCanvas.height;
 
-      if (width > maxDim || height > maxDim) {
-        if (width > height) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
+      }
+
+      // Base Canvas
+      const baseCanvas = document.createElement('canvas');
+      baseCanvas.width = w; baseCanvas.height = h;
+      const bCtx = baseCanvas.getContext('2d');
+      bCtx.drawImage(sourceCanvas, 0, 0, w, h);
+      const baseData = bCtx.getImageData(0, 0, w, h);
+
+      // --- Pass 1: Sharpened Grayscale (Best for Anti-Aliased Code/Ide Text) ---
+      const pass1Canvas = document.createElement('canvas');
+      pass1Canvas.width = w; pass1Canvas.height = h;
+      const p1Ctx = pass1Canvas.getContext('2d');
+      const p1Data = p1Ctx.createImageData(w, h);
+      
+      const gray = new Float32Array(w * h);
+      for (let i = 0, j = 0; i < baseData.data.length; i += 4, j++) {
+        gray[j] = baseData.data[i] * 0.299 + baseData.data[i + 1] * 0.587 + baseData.data[i + 2] * 0.114;
+      }
+
+      // 3x3 Sharpen Kernel
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = y * w + x;
+          const val = 5 * gray[idx] - gray[idx - w] - gray[idx + w] - gray[idx - 1] - gray[idx + 1];
+          const clamped = Math.min(255, Math.max(0, val));
+          const pIdx = idx * 4;
+          p1Data.data[pIdx] = p1Data.data[pIdx + 1] = p1Data.data[pIdx + 2] = clamped;
+          p1Data.data[pIdx + 3] = 255;
         }
       }
+      p1Ctx.putImageData(p1Data, 0, 0);
 
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(sourceCanvas, 0, 0, width, height);
+      // --- Pass 2: Adaptive Sauvola Binarization (Best for Glare & Bright Monitors) ---
+      const pass2Canvas = document.createElement('canvas');
+      pass2Canvas.width = w; pass2Canvas.height = h;
+      const p2Ctx = pass2Canvas.getContext('2d');
+      const p2Data = p2Ctx.createImageData(w, h);
 
-      const imgData = ctx.getImageData(0, 0, width, height);
-      const data = imgData.data;
-
-      // 1. Grayscale Conversion
-      const gray = new Float32Array(width * height);
-      for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-        gray[j] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      }
-
-      // 2. Spatial Low-Pass Anti-Moiré Smoothing (Removes Monitor Scanlines)
-      const smoothed = new Float32Array(width * height);
-      for (let y = 1; y < height - 1; y++) {
-        for (let x = 1; x < width - 1; x++) {
-          const idx = y * width + x;
-          smoothed[idx] = (
-            gray[idx - width - 1] + gray[idx - width] + gray[idx - width + 1] +
-            gray[idx - 1] + (gray[idx] * 4) + gray[idx + 1] +
-            gray[idx + width - 1] + gray[idx + width] + gray[idx + width + 1]
-          ) / 12;
-        }
-      }
-
-      // 3. Local Sauvola Binarization for Dynamic Screen Lighting
-      const windowSize = 21;
-      const halfW = Math.floor(windowSize / 2);
-      const k = 0.25;
+      const windowSize = 25;
+      const halfW = 12;
+      const k = 0.2;
       const R = 128;
 
-      const integral = new Float64Array((width + 1) * (height + 1));
-      const integralSq = new Float64Array((width + 1) * (height + 1));
+      const integral = new Float64Array((w + 1) * (h + 1));
+      const integralSq = new Float64Array((w + 1) * (h + 1));
 
-      for (let y = 0; y < height; y++) {
+      for (let y = 0; y < h; y++) {
         let rSum = 0, rSumSq = 0;
-        for (let x = 0; x < width; x++) {
-          const idx = y * width + x;
-          const val = smoothed[idx];
-          rSum += val;
-          rSumSq += val * val;
-
-          const iIdx = (y + 1) * (width + 1) + (x + 1);
-          integral[iIdx] = integral[iIdx - (width + 1)] + rSum;
-          integralSq[iIdx] = integralSq[iIdx - (width + 1)] + rSumSq;
+        for (let x = 0; x < w; x++) {
+          const idx = y * w + x;
+          const v = gray[idx];
+          rSum += v; rSumSq += v * v;
+          const iIdx = (y + 1) * (w + 1) + (x + 1);
+          integral[iIdx] = integral[iIdx - (w + 1)] + rSum;
+          integralSq[iIdx] = integralSq[iIdx - (w + 1)] + rSumSq;
         }
       }
 
-      function getSum(arr, x1, y1, x2, y2) {
-        const w = width + 1;
-        return arr[y2 * w + x2] - arr[y1 * w + x2] - arr[y2 * w + x1] + arr[y1 * w + x1];
-      }
-
-      for (let y = 0; y < height; y++) {
+      for (let y = 0; y < h; y++) {
         const y1 = Math.max(0, y - halfW);
-        const y2 = Math.min(height, y + halfW + 1);
-
-        for (let x = 0; x < width; x++) {
+        const y2 = Math.min(h, y + halfW + 1);
+        for (let x = 0; x < w; x++) {
           const x1 = Math.max(0, x - halfW);
-          const x2 = Math.min(width, x + halfW + 1);
-
+          const x2 = Math.min(w, x + halfW + 1);
           const count = (x2 - x1) * (y2 - y1);
-          const sum = getSum(integral, x1, y1, x2, y2);
-          const sumSq = getSum(integralSq, x1, y1, x2, y2);
+          
+          const stride = w + 1;
+          const sum = integral[y2 * stride + x2] - integral[y1 * stride + x2] - integral[y2 * stride + x1] + integral[y1 * stride + x1];
+          const sumSq = integralSq[y2 * stride + x2] - integralSq[y1 * stride + x2] - integralSq[y2 * stride + x1] + integralSq[y1 * stride + x1];
 
           const mean = sum / count;
-          const variance = (sumSq / count) - (mean * mean);
-          const stdDev = Math.sqrt(Math.max(0, variance));
-
+          const stdDev = Math.sqrt(Math.max(0, (sumSq / count) - (mean * mean)));
           const threshold = mean * (1 + k * ((stdDev / R) - 1));
-          const idx = y * width + x;
-          const pixelVal = smoothed[idx] < threshold ? 0 : 255;
 
+          const idx = y * w + x;
+          const val = gray[idx] < threshold ? 0 : 255;
           const pIdx = idx * 4;
-          data[pIdx] = data[pIdx + 1] = data[pIdx + 2] = pixelVal;
+          p2Data.data[pIdx] = p2Data.data[pIdx + 1] = p2Data.data[pIdx + 2] = val;
+          p2Data.data[pIdx + 3] = 255;
         }
       }
+      p2Ctx.putImageData(p2Data, 0, 0);
 
-      ctx.putImageData(imgData, 0, 0);
-      return canvas;
+      return { pass1Canvas, pass2Canvas, width: w, height: h };
     }
 
-    // Capture Trigger
+    // Capture & Execute OCR
     document.getElementById('btn-capture').onclick = () => {
       if (!video.videoWidth) return;
 
@@ -541,13 +546,13 @@
       ocrLoader.classList.remove('hidden');
       overlayContainer.innerHTML = '';
 
-      capturedImage.onload = () => runOCR(rawCanvas);
+      capturedImage.onload = () => runMultiPassOCR(rawCanvas);
     };
 
-    // Run OCR Engine
-    async function runOCR(rawCanvas) {
+    async function runMultiPassOCR(rawCanvas) {
       try {
-        const processedCanvas = preprocessScreenImage(rawCanvas);
+        loaderStatus.textContent = 'Enhancing image channels...';
+        const { pass1Canvas, pass2Canvas, width, height } = generatePasses(rawCanvas);
 
         if (!tesseractWorker) {
           tesseractWorker = await Tesseract.createWorker('eng');
@@ -558,28 +563,58 @@
           preserve_interword_spaces: '1'
         });
 
-        const { data } = await tesseractWorker.recognize(processedCanvas);
-        renderBoundingBoxes(data.words || [], processedCanvas.width, processedCanvas.height);
+        loaderStatus.textContent = 'Running Pass 1 (Grayscale)...';
+        const res1 = await tesseractWorker.recognize(pass1Canvas);
+
+        loaderStatus.textContent = 'Running Pass 2 (Binarized)...';
+        const res2 = await tesseractWorker.recognize(pass2Canvas);
+
+        // Deduplicate & pick highest confidence text blocks
+        const combined = mergeOCRResults(res1.data.words || [], res2.data.words || []);
+        renderBoundingBoxes(combined, width, height);
       } catch (err) {
-        alert('Could not read text from screen photo. Please try retaking standard angle.');
+        alert('Error processing screen text.');
         console.error(err);
       } finally {
         ocrLoader.classList.add('hidden');
       }
     }
 
-    // Render Bounding Boxes for Word Selection
+    function mergeOCRResults(words1, words2) {
+      const all = [...words1, ...words2];
+      const merged = [];
+
+      all.forEach(word => {
+        const text = word.text.trim();
+        if (text.length < 2 || word.confidence < 45) return;
+
+        // Check if box overlaps with an existing detected box
+        const duplicate = merged.find(existing => {
+          const overlapX = Math.abs(existing.bbox.x0 - word.bbox.x0) < 15;
+          const overlapY = Math.abs(existing.bbox.y0 - word.bbox.y0) < 15;
+          return overlapX && overlapY;
+        });
+
+        if (!duplicate) {
+          merged.push(word);
+        } else if (word.confidence > duplicate.confidence) {
+          // Replace with higher-confidence detection
+          const idx = merged.indexOf(duplicate);
+          merged[idx] = word;
+        }
+      });
+
+      return merged;
+    }
+
     function renderBoundingBoxes(words, imgWidth, imgHeight) {
       overlayContainer.innerHTML = '';
-      
       const rect = capturedImage.getBoundingClientRect();
       const scaleX = rect.width / imgWidth;
       const scaleY = rect.height / imgHeight;
 
       words.forEach(word => {
         const cleanText = word.text.trim();
-        if (cleanText.length < 2) return;
-
         const box = document.createElement('div');
         box.className = 'box-target';
         box.style.left = `${word.bbox.x0 * scaleX}px`;
@@ -611,13 +646,10 @@
       });
     }
 
-    resultText.oninput = () => {
-      renderQRCode(resultText.textContent);
-    };
+    resultText.oninput = () => renderQRCode(resultText.textContent);
 
     document.getElementById('btn-retake').onclick = resetToCamera;
     document.getElementById('btn-new-photo').onclick = resetToCamera;
-    
     document.getElementById('btn-pick-another').onclick = () => {
       qrView.classList.add('hidden');
       selectView.classList.remove('hidden');
@@ -630,7 +662,7 @@
       overlayContainer.innerHTML = '';
     }
 
-    window.onload = initApp;
+    window.onload = initCameras;
   </script>
 </body>
 </html>
