@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#09090b" />
-  <title>BIOS → QR Engine (Real OCR)</title>
+  <title>Tap → QR Engine</title>
 
-  <!-- QR Code Generator -->
+  <!-- QR Generator Engine -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- Fast Bundle OCR Engine -->
+  <!-- Fast OCR Engine -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
@@ -21,8 +21,8 @@
       --text-main: #f4f4f5;
       --text-muted: #a1a1aa;
       --border-color: #3f3f46;
-      --box-highlight: rgba(59, 130, 246, 0.35);
       --box-border: #60a5fa;
+      --box-highlight: rgba(59, 130, 246, 0.3);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
@@ -82,15 +82,6 @@
       text-overflow: ellipsis;
     }
 
-    .view-finder {
-      position: absolute;
-      width: 85%; height: 60%;
-      border: 2px dashed rgba(255, 255, 255, 0.3);
-      border-radius: 12px;
-      pointer-events: none;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-    }
-
     #overlay-container {
       position: absolute;
       top: 0; left: 0;
@@ -98,17 +89,18 @@
       pointer-events: auto;
     }
 
-    .bios-box {
+    .tap-target {
       position: absolute;
       border: 1.5px solid var(--box-border);
       background: var(--box-highlight);
-      border-radius: 2px;
+      border-radius: 3px;
       cursor: pointer;
-      box-shadow: 0 0 4px rgba(59, 130, 246, 0.4);
-      transition: background 0.1s ease;
+      box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+      transition: transform 0.08s ease, background 0.1s ease;
     }
 
-    .bios-box:active {
+    .tap-target:active {
+      transform: scale(0.98);
       background: rgba(59, 130, 246, 0.7);
       border-color: #ffffff;
     }
@@ -261,7 +253,6 @@
     </div>
     <div class="viewport">
       <video id="video" autoplay playsinline muted></video>
-      <div class="view-finder"></div>
     </div>
     <div class="control-bar">
       <button class="shutter-btn" id="btn-capture" aria-label="Take Photo">
@@ -272,13 +263,13 @@
 
   <!-- SELECTION VIEW -->
   <div id="select-view" class="view hidden">
-    <div class="view-header">Tap BIOS serial number line</div>
-    <div class="viewport">
+    <div class="view-header">Tap any text line to generate QR</div>
+    <div class="viewport" id="select-viewport">
       <img id="captured-image" alt="Captured BIOS screen" />
       <div id="overlay-container"></div>
       <div id="ocr-loader" class="loader-overlay hidden">
         <div class="spinner"></div>
-        <div style="font-size: 0.85rem; font-weight: 500;">Reading Text Characters...</div>
+        <div style="font-size: 0.85rem; font-weight: 500;">Reading Tapped Serial...</div>
       </div>
     </div>
     <div class="action-bar">
@@ -294,12 +285,12 @@
         <div id="qrcode"></div>
       </div>
       <div class="text-editor-card">
-        <label>Line Data (Tap to edit)</label>
+        <label>Extracted Text (Tap to edit)</label>
         <div id="result-text" contenteditable="true" spellcheck="false"></div>
       </div>
     </div>
     <div class="action-bar">
-      <button id="btn-pick-another" class="btn btn-secondary">Select Another Line</button>
+      <button id="btn-pick-another" class="btn btn-secondary">Select Another</button>
       <button id="btn-new-photo" class="btn">New Photo</button>
     </div>
   </div>
@@ -320,7 +311,6 @@
     const resultText = document.getElementById('result-text');
     const qrcodeEl = document.getElementById('qrcode');
 
-    // Pre-initialize lightweight worker in background
     async function initOCRWorker() {
       if (!ocrWorker) {
         ocrWorker = await Tesseract.createWorker('eng');
@@ -384,108 +374,118 @@
       cameraView.classList.add('hidden');
       selectView.classList.remove('hidden');
 
-      capturedImage.onload = () => processBiosTextLines(currentCanvas);
+      capturedImage.onload = () => generateTapTargets(currentCanvas);
     };
 
-    function processBiosTextLines(canvas) {
+    // Fast horizontal text band detection built specifically for BIOS screens
+    function generateTapTargets(canvas) {
       const ctx = canvas.getContext('2d');
-      const width = canvas.width;
-      const height = canvas.height;
-      const imgData = ctx.getImageData(0, 0, width, height);
+      const w = canvas.width;
+      const h = canvas.height;
+      const imgData = ctx.getImageData(0, 0, w, h);
       const data = imgData.data;
 
-      // Group horizontal contrast rows into selectable target boxes
-      const rowVariance = new Float32Array(height);
-      for (let y = 0; y < height; y++) {
-        let sumDiff = 0;
+      // Scan rows to find high-contrast text lines
+      const rowScores = new Float32Array(h);
+      for (let y = 0; y < h; y += 2) {
+        let diffSum = 0;
         let prevLuma = 0;
-        for (let x = 0; x < width; x += 4) {
-          const idx = (y * width + x) * 4;
+        for (let x = 0; x < w; x += 6) {
+          const idx = (y * w + x) * 4;
           const luma = data[idx] * 0.299 + data[idx+1] * 0.587 + data[idx+2] * 0.114;
-          if (x > 0) sumDiff += Math.abs(luma - prevLuma);
+          if (x > 0) diffSum += Math.abs(luma - prevLuma);
           prevLuma = luma;
         }
-        rowVariance[y] = sumDiff / (width / 4);
+        rowScores[y] = diffSum / (w / 6);
+        rowScores[y+1] = rowScores[y];
       }
 
+      // Group detected lines into interactive touch boxes
       const boxes = [];
-      let inLine = false;
+      let inBand = false;
       let startY = 0;
-      const minLineHeight = Math.round(height * 0.010);
-      const maxLineHeight = Math.round(height * 0.050);
 
-      for (let y = 0; y < height; y++) {
-        const hasTextContrast = rowVariance[y] > 14;
+      for (let y = 0; y < h; y++) {
+        const isTextRow = rowScores[y] > 12;
 
-        if (hasTextContrast && !inLine) {
-          inLine = true;
+        if (isTextRow && !inBand) {
+          inBand = true;
           startY = y;
-        } else if (!hasTextContrast && inLine) {
-          const lineHeight = y - startY;
-          if (lineHeight >= minLineHeight && lineHeight <= maxLineHeight) {
+        } else if (!isTextRow && inBand) {
+          const lineH = y - startY;
+          if (lineH > (h * 0.008) && lineH < (h * 0.06)) {
             boxes.push({
-              x: Math.round(width * 0.05),
+              x: Math.round(w * 0.02),
               y: Math.max(0, startY - 4),
-              w: Math.round(width * 0.90),
-              h: lineHeight + 8
+              w: Math.round(w * 0.96),
+              h: lineH + 8
             });
           }
-          inLine = false;
+          inBand = false;
         }
       }
 
-      renderBiosBoxes(boxes, width, height);
+      renderTapBoxes(boxes, w, h);
     }
 
-    function renderBiosBoxes(boxes, imgWidth, imgHeight) {
+    function renderTapBoxes(boxes, imgW, imgH) {
       overlayContainer.innerHTML = '';
       const rect = capturedImage.getBoundingClientRect();
-      const scaleX = rect.width / imgWidth;
-      const scaleY = rect.height / imgHeight;
+      const scaleX = rect.width / imgW;
+      const scaleY = rect.height / imgH;
 
       boxes.forEach(b => {
         const box = document.createElement('div');
-        box.className = 'bios-box';
+        box.className = 'tap-target';
         box.style.left = `${b.x * scaleX}px`;
         box.style.top = `${b.y * scaleY}px`;
         box.style.width = `${b.w * scaleX}px`;
         box.style.height = `${b.h * scaleY}px`;
 
-        box.onclick = () => extractTextFromBox(b);
+        box.onclick = () => readTappedBox(b);
         overlayContainer.appendChild(box);
       });
     }
 
-    async function extractTextFromBox(box) {
+    async function readTappedBox(b) {
       ocrLoader.classList.remove('hidden');
 
       try {
-        // Crop selected bounding box into standalone canvas
+        // Crop isolated line from canvas
         const cropCanvas = document.createElement('canvas');
-        cropCanvas.width = box.w;
-        cropCanvas.height = box.h;
+        cropCanvas.width = b.w;
+        cropCanvas.height = b.h;
         const cropCtx = cropCanvas.getContext('2d');
-        cropCtx.drawImage(currentCanvas, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+        cropCtx.drawImage(currentCanvas, b.x, b.y, b.w, b.h, 0, 0, b.w, b.h);
 
-        // Perform fast OCR read on tiny crop slice
-        if (!ocrWorker) await initOCRWorker();
-        const { data } = await ocrWorker.recognize(cropCanvas);
-        
-        // Clean output string (removes linebreaks/spaces)
-        let extractedString = (data.text || '').replace(/[\r\n]+/g, ' ').trim();
-
-        if (!extractedString) {
-          extractedString = "NO_TEXT_FOUND";
+        // Pre-process crop: threshold out screen lines & noise
+        const imgData = cropCtx.getImageData(0, 0, b.w, b.h);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const luma = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+          const v = luma > 115 ? 255 : 0;
+          data[i] = v; data[i+1] = v; data[i+2] = v;
         }
+        cropCtx.putImageData(imgData, 0, 0);
+
+        // Perform fast local OCR scan
+        if (!ocrWorker) await initOCRWorker();
+        const { data: ocrData } = await ocrWorker.recognize(cropCanvas);
+        
+        let cleaned = (ocrData.text || '')
+          .replace(/[\r\n]+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!cleaned) cleaned = "UNCLEAR_READ";
 
         selectView.classList.add('hidden');
         qrView.classList.remove('hidden');
-        resultText.textContent = extractedString;
-        renderQRCode(extractedString);
+        resultText.textContent = cleaned;
+        renderQRCode(cleaned);
 
       } catch (err) {
-        alert('OCR Read Failed');
-        console.error(err);
+        alert('Could not read tapped line.');
       } finally {
         ocrLoader.classList.add('hidden');
       }
