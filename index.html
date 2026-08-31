@@ -151,7 +151,6 @@
 </head>
 <body>
 
-  <!-- CAMERA -->
   <div id="camera-view" class="view">
     <div class="status-bar" id="status">Point at the text</div>
     <div id="video-container">
@@ -166,7 +165,6 @@
     </div>
   </div>
 
-  <!-- CROP -->
   <div id="crop-view" class="view hidden">
     <div class="status-bar" id="crop-status">Drag a tight box around the text</div>
     <div id="crop-container">
@@ -179,7 +177,6 @@
     </div>
   </div>
 
-  <!-- RESULT -->
   <div id="result-view" class="view hidden">
     <div id="lines"></div>
     <div id="qr-section" class="hidden">
@@ -265,7 +262,6 @@
       startCamera(devices[currentDeviceIndex].deviceId);
     };
 
-    // Capture
     document.getElementById('btn-capture').onclick = () => {
       if (!video.videoWidth) return;
 
@@ -296,7 +292,6 @@
       cropView.classList.remove('hidden');
     };
 
-    // Drawing
     function getPos(e) {
       const rect = cropCanvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -366,7 +361,6 @@
       ctx.strokeRect(selection.x, selection.y, selection.w, selection.h);
     }
 
-    // ========== IMPROVED OCR ==========
     async function doOCR() {
       if (!selection || !fullCanvas) return;
       btnOcr.disabled = true;
@@ -379,8 +373,8 @@
       const sw = Math.min(selection.w * scaleX, fullCanvas.width - sx);
       const sh = Math.min(selection.h * scaleY, fullCanvas.height - sy);
 
-      // Upscale 2.5× for better recognition
-      const upscale = 2.5;
+      // Moderate upscale
+      const upscale = 2.2;
       const targetW = Math.round(sw * upscale);
       const targetH = Math.round(sh * upscale);
 
@@ -388,28 +382,18 @@
       crop.width = targetW;
       crop.height = targetH;
       const cctx = crop.getContext('2d');
-
-      // High quality draw
       cctx.imageSmoothingEnabled = true;
       cctx.imageSmoothingQuality = 'high';
       cctx.drawImage(fullCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
 
-      // Strong preprocessing
+      // Softer preprocessing (less aggressive)
       const imgData = cctx.getImageData(0, 0, targetW, targetH);
       const d = imgData.data;
 
       for (let i = 0; i < d.length; i += 4) {
-        // Grayscale
         let gray = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
-
-        // Strong contrast
-        gray = (gray - 128) * 1.9 + 128;
-
-        // Soft threshold (helps with screen text)
-        if (gray > 160) gray = 255;
-        else if (gray < 90) gray = 0;
-        else gray = (gray - 90) * (255 / 70);
-
+        // Mild contrast boost only
+        gray = (gray - 128) * 1.35 + 128;
         gray = Math.max(0, Math.min(255, gray));
         d[i] = d[i+1] = d[i+2] = gray;
       }
@@ -420,27 +404,25 @@
           worker = await Tesseract.createWorker('eng');
         }
 
-        // Very important for codes like 5CD4345W6W
         await worker.setParameters({
-          tessedit_pageseg_mode: '7',               // single line
-          tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', // only these characters
+          tessedit_pageseg_mode: '7',
+          // Allow numbers, letters, dash and colon (for MAC addresses)
+          tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-:',
           preserve_interword_spaces: '0'
         });
 
         const { data: { text } } = await worker.recognize(crop);
 
-        // Clean result
         let cleaned = text
-          .replace(/[^0-9A-Z]/g, '')          // keep only allowed chars
+          .replace(/[^0-9A-Z\-:]/g, '')
           .trim();
 
         if (!cleaned || cleaned.length < 2) {
-          cropStatus.textContent = 'No clear text – try a tighter box + better lighting';
+          cropStatus.textContent = 'No text found – try a tighter box';
           btnOcr.disabled = false;
           return;
         }
 
-        // Show result
         linesEl.innerHTML = '';
         const div = document.createElement('div');
         div.className = 'line selected';
