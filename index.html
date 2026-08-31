@@ -44,12 +44,9 @@
       top: 0; left: 0;
       touch-action: none;
     }
-
     .camera-controls {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
+      bottom: 0; left: 0; right: 0;
       padding: 20px 24px 36px;
       display: flex;
       justify-content: space-between;
@@ -57,8 +54,7 @@
       background: linear-gradient(transparent, rgba(0,0,0,0.75));
     }
     .shutter {
-      width: 76px;
-      height: 76px;
+      width: 76px; height: 76px;
       border-radius: 50%;
       border: 4px solid #fff;
       background: transparent;
@@ -68,14 +64,12 @@
       padding: 0;
     }
     .shutter-inner {
-      width: 60px;
-      height: 60px;
+      width: 60px; height: 60px;
       border-radius: 50%;
       background: #fff;
     }
     .icon-btn {
-      width: 48px;
-      height: 48px;
+      width: 48px; height: 48px;
       border-radius: 50%;
       background: rgba(255,255,255,0.2);
       border: none;
@@ -87,9 +81,7 @@
     }
     .status-bar {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
+      top: 0; left: 0; right: 0;
       padding: 14px 16px;
       text-align: center;
       font-size: 1rem;
@@ -97,7 +89,6 @@
       pointer-events: none;
       z-index: 10;
     }
-
     .crop-controls {
       padding: 16px;
       display: flex;
@@ -119,7 +110,6 @@
       background: #333;
       color: #eee;
     }
-
     #lines {
       flex: 1;
       overflow-y: auto;
@@ -131,11 +121,12 @@
       background: white;
       padding: 16px;
       border-radius: 12px;
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       line-height: 1.45;
       border: 2px solid transparent;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
       word-break: break-word;
+      font-family: monospace;
     }
     .line.selected {
       border-color: #007aff;
@@ -177,7 +168,7 @@
 
   <!-- CROP -->
   <div id="crop-view" class="view hidden">
-    <div class="status-bar" id="crop-status">Drag a box around the text</div>
+    <div class="status-bar" id="crop-status">Drag a tight box around the text</div>
     <div id="crop-container">
       <img id="captured-image" />
       <canvas id="crop-canvas"></canvas>
@@ -283,7 +274,7 @@
       fullCanvas.height = video.videoHeight;
       fullCanvas.getContext('2d').drawImage(video, 0, 0);
 
-      capturedImage.src = fullCanvas.toDataURL('image/jpeg', 0.93);
+      capturedImage.src = fullCanvas.toDataURL('image/jpeg', 0.95);
       capturedImage.onload = () => {
         const rect = capturedImage.getBoundingClientRect();
         const container = document.getElementById('crop-container').getBoundingClientRect();
@@ -297,7 +288,7 @@
 
         selection = null;
         btnOcr.disabled = true;
-        cropStatus.textContent = 'Drag a box around the text';
+        cropStatus.textContent = 'Drag a tight box around the text';
         drawSelection();
       };
 
@@ -342,15 +333,14 @@
     function endDraw() {
       isDrawing = false;
 
-      if (selection && selection.w > 25 && selection.h > 15) {
+      if (selection && selection.w > 20 && selection.h > 12) {
         btnOcr.disabled = false;
-        cropStatus.textContent = 'Reading text…';
-        // Auto-start reading
-        setTimeout(() => doOCR(), 300);
+        cropStatus.textContent = 'Reading…';
+        setTimeout(() => doOCR(), 250);
       } else {
         selection = null;
         btnOcr.disabled = true;
-        cropStatus.textContent = 'Drag a bigger box around the text';
+        cropStatus.textContent = 'Draw a bigger box around the text';
         drawSelection();
       }
     }
@@ -367,7 +357,7 @@
       ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
       if (!selection) return;
 
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
       ctx.clearRect(selection.x, selection.y, selection.w, selection.h);
 
@@ -376,10 +366,9 @@
       ctx.strokeRect(selection.x, selection.y, selection.w, selection.h);
     }
 
-    // OCR function
+    // ========== IMPROVED OCR ==========
     async function doOCR() {
       if (!selection || !fullCanvas) return;
-
       btnOcr.disabled = true;
 
       const scaleX = fullCanvas.width / cropCanvas.width;
@@ -390,26 +379,39 @@
       const sw = Math.min(selection.w * scaleX, fullCanvas.width - sx);
       const sh = Math.min(selection.h * scaleY, fullCanvas.height - sy);
 
-      // Upscale for better accuracy
-      const scale = 2;
-      const targetW = sw * scale;
-      const targetH = sh * scale;
+      // Upscale 2.5× for better recognition
+      const upscale = 2.5;
+      const targetW = Math.round(sw * upscale);
+      const targetH = Math.round(sh * upscale);
 
       const crop = document.createElement('canvas');
       crop.width = targetW;
       crop.height = targetH;
       const cctx = crop.getContext('2d');
+
+      // High quality draw
       cctx.imageSmoothingEnabled = true;
+      cctx.imageSmoothingQuality = 'high';
       cctx.drawImage(fullCanvas, sx, sy, sw, sh, 0, 0, targetW, targetH);
 
-      // Strong contrast
+      // Strong preprocessing
       const imgData = cctx.getImageData(0, 0, targetW, targetH);
       const d = imgData.data;
+
       for (let i = 0; i < d.length; i += 4) {
-        const gray = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
-        let v = (gray - 128) * 1.7 + 128;
-        v = Math.max(0, Math.min(255, v));
-        d[i] = d[i+1] = d[i+2] = v;
+        // Grayscale
+        let gray = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+
+        // Strong contrast
+        gray = (gray - 128) * 1.9 + 128;
+
+        // Soft threshold (helps with screen text)
+        if (gray > 160) gray = 255;
+        else if (gray < 90) gray = 0;
+        else gray = (gray - 90) * (255 / 70);
+
+        gray = Math.max(0, Math.min(255, gray));
+        d[i] = d[i+1] = d[i+2] = gray;
       }
       cctx.putImageData(imgData, 0, 0);
 
@@ -417,19 +419,28 @@
         if (!worker) {
           worker = await Tesseract.createWorker('eng');
         }
+
+        // Very important for codes like 5CD4345W6W
         await worker.setParameters({
-          tessedit_pageseg_mode: '7'
+          tessedit_pageseg_mode: '7',               // single line
+          tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', // only these characters
+          preserve_interword_spaces: '0'
         });
 
         const { data: { text } } = await worker.recognize(crop);
-        const cleaned = text.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+
+        // Clean result
+        let cleaned = text
+          .replace(/[^0-9A-Z]/g, '')          // keep only allowed chars
+          .trim();
 
         if (!cleaned || cleaned.length < 2) {
-          cropStatus.textContent = 'No text found – try a tighter box';
+          cropStatus.textContent = 'No clear text – try a tighter box + better lighting';
           btnOcr.disabled = false;
           return;
         }
 
+        // Show result
         linesEl.innerHTML = '';
         const div = document.createElement('div');
         div.className = 'line selected';
@@ -441,12 +452,12 @@
         cropView.classList.add('hidden');
         resultView.classList.remove('hidden');
       } catch (err) {
+        console.error(err);
         cropStatus.textContent = 'Reading failed – try again';
         btnOcr.disabled = false;
       }
     }
 
-    // Manual button still works
     btnOcr.onclick = doOCR;
 
     function showQR(text) {
