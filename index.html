@@ -20,7 +20,7 @@
       --text-main: #f4f4f5;
       --text-muted: #a1a1aa;
       --border-color: #3f3f46;
-      --box-highlight: rgba(59, 130, 246, 0.4);
+      --box-highlight: rgba(59, 130, 246, 0.35);
       --box-border: #60a5fa;
     }
 
@@ -87,7 +87,7 @@
       text-overflow: ellipsis;
     }
 
-    /* Framing Reticle */
+    /* Framing Reticle (Cleaned up, text removed) */
     .view-finder {
       position: absolute;
       width: 80%;
@@ -96,22 +96,6 @@
       border-radius: 16px;
       pointer-events: none;
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .view-finder::after {
-      content: "Tap video to focus";
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      background: rgba(0, 0, 0, 0.65);
-      padding: 6px 14px;
-      border-radius: 20px;
-      backdrop-filter: blur(4px);
     }
 
     /* OCR Target Selection Boxes */
@@ -129,12 +113,12 @@
       border-radius: 4px;
       cursor: pointer;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-      transition: transform 0.1s ease;
+      transition: transform 0.1s ease, background 0.15s ease;
     }
 
     .box-target:active {
-      transform: scale(0.95);
-      background: rgba(59, 130, 246, 0.7);
+      transform: scale(0.97);
+      background: rgba(59, 130, 246, 0.65);
       border-color: #ffffff;
     }
 
@@ -318,13 +302,13 @@
 
   <!-- OCR SELECTION VIEW -->
   <div id="select-view" class="view hidden">
-    <div class="view-header">Tap text box to convert to QR</div>
+    <div class="view-header">Tap text block to convert to QR</div>
     <div class="viewport">
       <img id="captured-image" alt="Captured screen" />
       <div id="overlay-container"></div>
       <div id="ocr-loader" class="loader-overlay">
         <div class="spinner"></div>
-        <div style="font-weight: 500;" id="loader-status">Processing Screen Text...</div>
+        <div style="font-weight: 500;" id="loader-status">Scanning Text...</div>
       </div>
     </div>
     <div class="action-bar">
@@ -367,7 +351,7 @@
     let stream = null;
     let tesseractWorker = null;
 
-    // --- 1. CAMERA SELECTION & ENUMERATION ---
+    // Initialize Camera Devices
     async function initCameras() {
       try {
         const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -404,7 +388,7 @@
       }
     }
 
-    // --- 2. FOCUS DISTANCE PROBING & HARDWARE INITIALIZATION ---
+    // Configure Camera Stream
     async function startCamera(deviceId) {
       if (stream) stream.getTracks().forEach(t => t.stop());
 
@@ -426,17 +410,12 @@
         const capabilities = track.getCapabilities ? track.getCapabilities() : {};
         const advancedConstraints = {};
 
-        // Force continuous auto focus mode
         if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
           advancedConstraints.focusMode = 'continuous';
         }
-
-        // Set focus to maximum close range (macro boundary)
         if (capabilities.focusDistance) {
           advancedConstraints.focusDistance = capabilities.focusDistance.max;
         }
-
-        // Apply a minor zoom boost (1.5x) to back off from screen surface while maintaining tight focus
         if (capabilities.zoom) {
           const idealZoom = Math.min(1.5, capabilities.zoom.max);
           advancedConstraints.zoom = Math.max(capabilities.zoom.min, idealZoom);
@@ -454,7 +433,7 @@
 
     cameraSelect.onchange = () => startCamera(cameraSelect.value);
 
-    // --- 3. TAP-TO-FOCUS OVERRIDE ---
+    // Tap-to-Focus Handler
     function enableTapToFocus(track, capabilities) {
       cameraViewport.onclick = async (event) => {
         if (!capabilities.focusMode) return;
@@ -494,9 +473,9 @@
       setTimeout(() => { ring.style.opacity = '0'; }, 500);
     }
 
-    // --- 4. MULTI-PASS OCR PIPELINE ---
-    function generatePasses(sourceCanvas) {
-      const maxDim = 1800;
+    // Single High-Contrast Preprocessing Pass Optimized for Screen Fonts
+    function preprocessCanvas(sourceCanvas) {
+      const maxDim = 1920;
       let w = sourceCanvas.width;
       let h = sourceCanvas.height;
 
@@ -505,89 +484,27 @@
         else { w = Math.round((w * maxDim) / h); h = maxDim; }
       }
 
-      const baseCanvas = document.createElement('canvas');
-      baseCanvas.width = w; baseCanvas.height = h;
-      const bCtx = baseCanvas.getContext('2d');
-      bCtx.drawImage(sourceCanvas, 0, 0, w, h);
-      const baseData = bCtx.getImageData(0, 0, w, h);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(sourceCanvas, 0, 0, w, h);
 
-      // Pass 1: Sharpened Grayscale
-      const pass1Canvas = document.createElement('canvas');
-      pass1Canvas.width = w; pass1Canvas.height = h;
-      const p1Ctx = pass1Canvas.getContext('2d');
-      const p1Data = p1Ctx.createImageData(w, h);
-      
-      const gray = new Float32Array(w * h);
-      for (let i = 0, j = 0; i < baseData.data.length; i += 4, j++) {
-        gray[j] = baseData.data[i] * 0.299 + baseData.data[i + 1] * 0.587 + baseData.data[i + 2] * 0.114;
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+
+      // Contrast stretching for LCD/OLED screens
+      for (let i = 0; i < data.length; i += 4) {
+        const v = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        // High contrast curve
+        const enhanced = v < 128 ? Math.max(0, v - 20) : Math.min(255, v + 20);
+        data[i] = data[i + 1] = data[i + 2] = enhanced;
       }
 
-      for (let y = 1; y < h - 1; y++) {
-        for (let x = 1; x < w - 1; x++) {
-          const idx = y * w + x;
-          const val = 5 * gray[idx] - gray[idx - w] - gray[idx + w] - gray[idx - 1] - gray[idx + 1];
-          const clamped = Math.min(255, Math.max(0, val));
-          const pIdx = idx * 4;
-          p1Data.data[pIdx] = p1Data.data[pIdx + 1] = p1Data.data[pIdx + 2] = clamped;
-          p1Data.data[pIdx + 3] = 255;
-        }
-      }
-      p1Ctx.putImageData(p1Data, 0, 0);
-
-      // Pass 2: Adaptive Sauvola Binarization
-      const pass2Canvas = document.createElement('canvas');
-      pass2Canvas.width = w; pass2Canvas.height = h;
-      const p2Ctx = pass2Canvas.getContext('2d');
-      const p2Data = p2Ctx.createImageData(w, h);
-
-      const halfW = 12;
-      const k = 0.2;
-      const R = 128;
-
-      const integral = new Float64Array((w + 1) * (h + 1));
-      const integralSq = new Float64Array((w + 1) * (h + 1));
-
-      for (let y = 0; y < h; y++) {
-        let rSum = 0, rSumSq = 0;
-        for (let x = 0; x < w; x++) {
-          const idx = y * w + x;
-          const v = gray[idx];
-          rSum += v; rSumSq += v * v;
-          const iIdx = (y + 1) * (w + 1) + (x + 1);
-          integral[iIdx] = integral[iIdx - (w + 1)] + rSum;
-          integralSq[iIdx] = integralSq[iIdx - (w + 1)] + rSumSq;
-        }
-      }
-
-      for (let y = 0; y < h; y++) {
-        const y1 = Math.max(0, y - halfW);
-        const y2 = Math.min(h, y + halfW + 1);
-        for (let x = 0; x < w; x++) {
-          const x1 = Math.max(0, x - halfW);
-          const x2 = Math.min(w, x + halfW + 1);
-          const count = (x2 - x1) * (y2 - y1);
-          
-          const stride = w + 1;
-          const sum = integral[y2 * stride + x2] - integral[y1 * stride + x2] - integral[y2 * stride + x1] + integral[y1 * stride + x1];
-          const sumSq = integralSq[y2 * stride + x2] - integralSq[y1 * stride + x2] - integralSq[y2 * stride + x1] + integralSq[y1 * stride + x1];
-
-          const mean = sum / count;
-          const stdDev = Math.sqrt(Math.max(0, (sumSq / count) - (mean * mean)));
-          const threshold = mean * (1 + k * ((stdDev / R) - 1));
-
-          const idx = y * w + x;
-          const val = gray[idx] < threshold ? 0 : 255;
-          const pIdx = idx * 4;
-          p2Data.data[pIdx] = p2Data.data[pIdx + 1] = p2Data.data[pIdx + 2] = val;
-          p2Data.data[pIdx + 3] = 255;
-        }
-      }
-      p2Ctx.putImageData(p2Data, 0, 0);
-
-      return { pass1Canvas, pass2Canvas, width: w, height: h };
+      ctx.putImageData(imgData, 0, 0);
+      return { canvas, width: w, height: h };
     }
 
-    // --- 5. EXECUTION & SELECTION LOGIC ---
+    // Photo Capture Trigger
     document.getElementById('btn-capture').onclick = () => {
       if (!video.videoWidth) return;
 
@@ -603,31 +520,29 @@
       ocrLoader.classList.remove('hidden');
       overlayContainer.innerHTML = '';
 
-      capturedImage.onload = () => runMultiPassOCR(rawCanvas);
+      capturedImage.onload = () => runHighAccuracyOCR(rawCanvas);
     };
 
-    async function runMultiPassOCR(rawCanvas) {
+    // Single-Block High Precision OCR
+    async function runHighAccuracyOCR(rawCanvas) {
       try {
-        loaderStatus.textContent = 'Enhancing image channels...';
-        const { pass1Canvas, pass2Canvas, width, height } = generatePasses(rawCanvas);
+        loaderStatus.textContent = 'Analyzing Screen Text...';
+        const { canvas, width, height } = preprocessCanvas(rawCanvas);
 
         if (!tesseractWorker) {
           tesseractWorker = await Tesseract.createWorker('eng');
         }
 
+        // PSM 6 (SINGLE_BLOCK) prevents fragmenting text into random individual word boxes
         await tesseractWorker.setParameters({
-          tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+          tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK,
           preserve_interword_spaces: '1'
         });
 
-        loaderStatus.textContent = 'Running Pass 1 (Grayscale)...';
-        const res1 = await tesseractWorker.recognize(pass1Canvas);
+        const result = await tesseractWorker.recognize(canvas);
+        const lines = result.data.lines || [];
 
-        loaderStatus.textContent = 'Running Pass 2 (Binarized)...';
-        const res2 = await tesseractWorker.recognize(pass2Canvas);
-
-        const combined = mergeOCRResults(res1.data.words || [], res2.data.words || []);
-        renderBoundingBoxes(combined, width, height);
+        renderLineBoundingBoxes(lines, width, height);
       } catch (err) {
         alert('Error processing screen text.');
         console.error(err);
@@ -636,45 +551,23 @@
       }
     }
 
-    function mergeOCRResults(words1, words2) {
-      const all = [...words1, ...words2];
-      const merged = [];
-
-      all.forEach(word => {
-        const text = word.text.trim();
-        if (text.length < 2 || word.confidence < 45) return;
-
-        const duplicate = merged.find(existing => {
-          const overlapX = Math.abs(existing.bbox.x0 - word.bbox.x0) < 15;
-          const overlapY = Math.abs(existing.bbox.y0 - word.bbox.y0) < 15;
-          return overlapX && overlapY;
-        });
-
-        if (!duplicate) {
-          merged.push(word);
-        } else if (word.confidence > duplicate.confidence) {
-          const idx = merged.indexOf(duplicate);
-          merged[idx] = word;
-        }
-      });
-
-      return merged;
-    }
-
-    function renderBoundingBoxes(words, imgWidth, imgHeight) {
+    // Render Clean Line-Level Selection Targets
+    function renderLineBoundingBoxes(lines, imgWidth, imgHeight) {
       overlayContainer.innerHTML = '';
       const rect = capturedImage.getBoundingClientRect();
       const scaleX = rect.width / imgWidth;
       const scaleY = rect.height / imgHeight;
 
-      words.forEach(word => {
-        const cleanText = word.text.trim();
+      lines.forEach(line => {
+        const cleanText = line.text.trim();
+        if (cleanText.length < 2 || line.confidence < 35) return;
+
         const box = document.createElement('div');
         box.className = 'box-target';
-        box.style.left = `${word.bbox.x0 * scaleX}px`;
-        box.style.top = `${word.bbox.y0 * scaleY}px`;
-        box.style.width = `${(word.bbox.x1 - word.bbox.x0) * scaleX}px`;
-        box.style.height = `${(word.bbox.y1 - word.bbox.y0) * scaleY}px`;
+        box.style.left = `${line.bbox.x0 * scaleX}px`;
+        box.style.top = `${line.bbox.y0 * scaleY}px`;
+        box.style.width = `${(line.bbox.x1 - line.bbox.x0) * scaleX}px`;
+        box.style.height = `${(line.bbox.y1 - line.bbox.y0) * scaleY}px`;
 
         box.onclick = () => selectText(cleanText);
         overlayContainer.appendChild(box);
