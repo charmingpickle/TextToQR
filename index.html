@@ -4,12 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <meta name="theme-color" content="#f5f5f5" />
-  <title>Scan → Select Line → QR / Barcode</title>
+  <title>Scan → Line → QR</title>
 
-  <!-- More reliable libraries -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -72,8 +70,37 @@
     }
     video {
       max-width: 100%;
-      max-height: 55vh;
+      max-height: 60vh;
       object-fit: contain;
+    }
+    /* Framing box overlay */
+    #frame-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #frame-box {
+      width: 88%;
+      height: 22%;
+      border: 3px solid #00e676;
+      border-radius: 10px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+      position: relative;
+    }
+    #frame-box::after {
+      content: "Align one sentence inside this box";
+      position: absolute;
+      bottom: -28px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #00e676;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
     }
     .controls {
       padding: 14px 16px;
@@ -109,23 +136,19 @@
       border-color: #007aff;
       background: #e8f1ff;
     }
-    #code-section {
+    #qr-section {
       padding: 18px;
       text-align: center;
       background: #ffffff;
       border-top: 1px solid #ddd;
     }
-    #qrcode, #barcode {
+    #qrcode {
       margin: 12px auto;
       background: white;
       padding: 16px;
       border-radius: 12px;
       display: inline-block;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    #barcode {
-      max-width: 100%;
-      overflow-x: auto;
     }
     .status {
       font-size: 0.95rem;
@@ -142,25 +165,21 @@
       flex-wrap: wrap;
       justify-content: center;
     }
-    .code-buttons {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Scan → Line → QR / Barcode</h1>
+    <h1>Scan → Line → QR</h1>
   </header>
 
   <div id="camera-view">
-    <div class="status" id="status">Choose camera and point at text</div>
+    <div class="status" id="status">Align text inside the green box</div>
 
     <div id="video-container">
       <video id="video" autoplay playsinline muted></video>
+      <div id="frame-overlay">
+        <div id="frame-box"></div>
+      </div>
     </div>
 
     <div class="controls">
@@ -170,26 +189,16 @@
         </select>
         <button id="btn-refocus" class="secondary small">Refocus</button>
       </div>
-      <button id="btn-capture">Capture &amp; OCR</button>
+      <button id="btn-capture">Capture Area</button>
     </div>
   </div>
 
   <div id="result-view" class="hidden">
-    <div class="status">Tap a line, then choose QR or Barcode</div>
+    <div class="status">Tap the line you want</div>
     <div id="lines"></div>
-
-    <div id="code-section" class="hidden">
-      <div class="code-buttons">
-        <button id="btn-qr" class="small">Generate QR</button>
-        <button id="btn-barcode" class="secondary small">Generate Barcode</button>
-      </div>
-
-      <div id="qrcode" class="hidden"></div>
-      <div id="barcode" class="hidden">
-        <svg id="barcode-svg"></svg>
-      </div>
-
-      <p style="margin-top:12px;font-size:0.95rem;color:#555">Scan with another device</p>
+    <div id="qr-section" class="hidden">
+      <div id="qrcode"></div>
+      <p style="margin-top:12px;font-size:0.95rem;color:#555">Scan this QR with another device</p>
       <button id="btn-back" class="secondary" style="margin-top:14px">← Back to camera</button>
     </div>
   </div>
@@ -198,17 +207,16 @@
     const video = document.getElementById('video');
     const statusEl = document.getElementById('status');
     const linesEl = document.getElementById('lines');
-    const codeSection = document.getElementById('code-section');
+    const qrSection = document.getElementById('qr-section');
     const qrcodeEl = document.getElementById('qrcode');
-    const barcodeEl = document.getElementById('barcode');
     const cameraView = document.getElementById('camera-view');
     const resultView = document.getElementById('result-view');
     const cameraSelect = document.getElementById('camera-select');
+    const frameBox = document.getElementById('frame-box');
 
     let stream = null;
     let currentTrack = null;
     let worker = null;
-    let selectedText = '';
 
     async function getCameras() {
       try {
@@ -219,11 +227,6 @@
         const devices = all.filter(d => d.kind === 'videoinput');
 
         cameraSelect.innerHTML = '';
-        if (devices.length === 0) {
-          cameraSelect.innerHTML = '<option>No cameras found</option>';
-          return;
-        }
-
         devices.forEach((d, i) => {
           const opt = document.createElement('option');
           opt.value = d.deviceId;
@@ -247,15 +250,15 @@
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             deviceId: deviceId ? { exact: deviceId } : undefined,
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
           },
           audio: false
         });
         video.srcObject = stream;
         currentTrack = stream.getVideoTracks()[0];
         applyFocus();
-        statusEl.textContent = 'Point at text and tap Capture';
+        statusEl.textContent = 'Align one sentence inside the green box';
       } catch (err) {
         statusEl.textContent = 'Camera error: ' + err.message;
       }
@@ -275,73 +278,119 @@
     document.getElementById('btn-refocus').onclick = () => {
       applyFocus();
       statusEl.textContent = 'Refocusing…';
-      setTimeout(() => statusEl.textContent = 'Point at text and tap Capture', 700);
+      setTimeout(() => statusEl.textContent = 'Align one sentence inside the green box', 700);
     };
 
+    // Crop only the green box area + improve image for OCR
+    function getCroppedCanvas() {
+      const videoRect = video.getBoundingClientRect();
+      const boxRect = frameBox.getBoundingClientRect();
+
+      // Calculate scale between displayed video and actual video resolution
+      const scaleX = video.videoWidth / videoRect.width;
+      const scaleY = video.videoHeight / videoRect.height;
+
+      const cropX = (boxRect.left - videoRect.left) * scaleX;
+      const cropY = (boxRect.top - videoRect.top) * scaleY;
+      const cropW = boxRect.width * scaleX;
+      const cropH = boxRect.height * scaleY;
+
+      // Create high-res cropped canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW;
+      canvas.height = cropH;
+      const ctx = canvas.getContext('2d');
+
+      // Draw the cropped region
+      ctx.drawImage(
+        video,
+        cropX, cropY, cropW, cropH,
+        0, 0, cropW, cropH
+      );
+
+      // Pre-process for better OCR accuracy
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // Convert to grayscale + increase contrast
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        // Simple contrast boost
+        let val = ((gray - 128) * 1.4) + 128;
+        val = Math.max(0, Math.min(255, val));
+        data[i] = data[i + 1] = data[i + 2] = val;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      return canvas;
+    }
+
     document.getElementById('btn-capture').onclick = async () => {
-      if (!stream) return;
+      if (!stream || !video.videoWidth) return;
+
       const btn = document.getElementById('btn-capture');
       btn.disabled = true;
-      statusEl.textContent = 'Running OCR…';
-
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
+      statusEl.textContent = 'Reading text in the box…';
 
       try {
-        if (!worker) worker = await Tesseract.createWorker('eng');
-        const { data: { text, lines } } = await worker.recognize(canvas);
+        const cropped = getCroppedCanvas();
 
-        let lineList = [];
-        if (lines?.length) {
-          lineList = lines.filter(l => l.text?.trim().length > 1).map(l => l.text.trim());
-        } else {
-          lineList = text.split(/\n+/).map(t => t.trim()).filter(t => t.length > 1);
+        if (!worker) {
+          worker = await Tesseract.createWorker('eng', 1, {
+            // Better settings for single line / sentence
+            tessedit_pageseg_mode: '7', // Treat as single text line
+            preserve_interword_spaces: '1'
+          });
         }
 
-        if (lineList.length === 0) {
-          statusEl.textContent = 'No text found';
+        const { data: { text } } = await worker.recognize(cropped);
+
+        // Clean up the result
+        let cleaned = text
+          .replace(/\n+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!cleaned || cleaned.length < 2) {
+          statusEl.textContent = 'No text found in the box. Try again.';
           btn.disabled = false;
           return;
         }
 
+        // Show as selectable lines (split if multiple sentences detected)
+        const possibleLines = cleaned.split(/(?<=[.?!])\s+/).filter(l => l.trim().length > 1);
+
         linesEl.innerHTML = '';
-        lineList.forEach(line => {
+        (possibleLines.length ? possibleLines : [cleaned]).forEach(line => {
           const div = document.createElement('div');
           div.className = 'line';
-          div.textContent = line;
+          div.textContent = line.trim();
           div.onclick = () => {
             document.querySelectorAll('.line').forEach(l => l.classList.remove('selected'));
             div.classList.add('selected');
-            selectedText = line;
-            codeSection.classList.remove('hidden');
-            qrcodeEl.classList.add('hidden');
-            barcodeEl.classList.add('hidden');
+            showQR(line.trim());
           };
           linesEl.appendChild(div);
         });
 
         cameraView.classList.add('hidden');
         resultView.classList.remove('hidden');
-        codeSection.classList.add('hidden');
+        qrSection.classList.add('hidden');
       } catch (err) {
-        statusEl.textContent = 'OCR failed: ' + err.message;
+        console.error(err);
+        statusEl.textContent = 'OCR error: ' + err.message;
       }
+
       btn.disabled = false;
     };
 
-    // ===== QR Code (using reliable library) =====
-    document.getElementById('btn-qr').onclick = () => {
-      if (!selectedText) return;
-
+    function showQR(text) {
       qrcodeEl.innerHTML = '';
-      qrcodeEl.classList.remove('hidden');
-      barcodeEl.classList.add('hidden');
+      qrSection.classList.remove('hidden');
 
       try {
         new QRCode(qrcodeEl, {
-          text: selectedText,
+          text: text,
           width: 240,
           height: 240,
           colorDark: '#000000',
@@ -349,42 +398,14 @@
           correctLevel: QRCode.CorrectLevel.M
         });
       } catch (err) {
-        qrcodeEl.innerHTML = '<p style="color:red;padding:20px">QR failed. Try Barcode instead.</p>';
+        qrcodeEl.innerHTML = '<p style="color:red;padding:20px">Could not create QR</p>';
       }
-    };
-
-    // ===== Barcode (Code 128) =====
-    document.getElementById('btn-barcode').onclick = () => {
-      if (!selectedText) return;
-
-      // Code 128 has length limits – truncate if too long
-      let text = selectedText;
-      if (text.length > 80) {
-        text = text.substring(0, 80);
-        alert('Text was truncated to 80 characters for barcode');
-      }
-
-      qrcodeEl.classList.add('hidden');
-      barcodeEl.classList.remove('hidden');
-
-      try {
-        JsBarcode('#barcode-svg', text, {
-          format: 'CODE128',
-          width: 2,
-          height: 80,
-          displayValue: true,
-          fontSize: 14,
-          margin: 10
-        });
-      } catch (err) {
-        barcodeEl.innerHTML = '<p style="color:red;padding:20px">Barcode failed</p>';
-      }
-    };
+    }
 
     document.getElementById('btn-back').onclick = () => {
       resultView.classList.add('hidden');
       cameraView.classList.remove('hidden');
-      statusEl.textContent = 'Point at text and tap Capture';
+      statusEl.textContent = 'Align one sentence inside the green box';
     };
 
     getCameras();
