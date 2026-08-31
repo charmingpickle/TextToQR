@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#09090b" />
-  <title>Tap → QR Pro (PaddleOCR Real-time Installer)</title>
+  <title>Tap → QR Pro (Self-Installing OCR)</title>
 
-  <!-- QR Generator Engine -->
+  <!-- QR Code Generator Engine -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <!-- ONNX Runtime Web Engine -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.18.0/dist/ort.min.js"></script>
+  <!-- Tesseract OCR Engine -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
     :root {
@@ -43,8 +43,7 @@
       display: flex;
       flex-direction: column;
       position: relative;
-      width: 100%;
-      height: 100dvh;
+      width: 100%; height: 100dvh;
       overflow: hidden;
     }
 
@@ -59,8 +58,7 @@
     }
 
     video, #captured-image {
-      width: 100%;
-      height: 100%;
+      width: 100%; height: 100%;
       object-fit: contain;
     }
 
@@ -140,9 +138,7 @@
       animation: spin 0.8s linear infinite;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .control-bar {
       position: absolute;
@@ -264,18 +260,15 @@
       user-select: text;
     }
 
-    /* Tracked Progress Bar Elements */
     .progress-box {
-      width: 100%;
-      max-width: 300px;
+      width: 100%; max-width: 300px;
       display: flex;
       flex-direction: column;
       gap: 8px;
     }
 
     .progress-bar-container {
-      width: 100%;
-      height: 8px;
+      width: 100%; height: 8px;
       background: var(--bg-card);
       border-radius: 4px;
       overflow: hidden;
@@ -283,8 +276,7 @@
     }
 
     .progress-bar {
-      width: 0%;
-      height: 100%;
+      width: 0%; height: 100%;
       background: var(--accent-color);
       transition: width 0.15s linear;
     }
@@ -294,18 +286,18 @@
 </head>
 <body>
 
-  <!-- FIRST-BOOT TRACKED INSTALLER OVERLAY -->
+  <!-- FIRST-BOOT INSTALLER OVERLAY -->
   <div id="installer-overlay" class="loader-overlay">
-    <div style="font-size: 1.3rem; font-weight: 700;">PaddleOCR First Boot</div>
+    <div style="font-size: 1.3rem; font-weight: 700;">OCR First Boot</div>
     <div style="font-size: 0.9rem; color: var(--text-muted); max-width: 280px;">
-      Downloads runtime models into local browser storage (~10MB total).
+      Downloads language models into local browser storage (~4MB).
     </div>
     
     <button id="btn-install" class="btn" style="max-width: 200px; margin-top: 12px;">Initialize Engine</button>
     
     <div id="install-status-container" class="progress-box hidden">
       <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted);">
-        <span id="install-step">Preparing connection...</span>
+        <span id="install-step">Initializing worker...</span>
         <span id="install-percent">0%</span>
       </div>
       <div class="progress-bar-container">
@@ -340,7 +332,7 @@
       <div id="overlay-container"></div>
       <div id="ocr-loader" class="loader-overlay hidden">
         <div class="spinner"></div>
-        <div style="font-weight: 500;" id="loader-status">Running Inference...</div>
+        <div style="font-weight: 500;" id="loader-status">Running OCR Detection...</div>
       </div>
     </div>
     <div class="action-bar">
@@ -367,15 +359,8 @@
   </div>
 
   <script>
-    // Direct model targets for transparent byte tracking
-    const MODELS = {
-      det: 'https://cdn.jsdelivr.net/npm/@paddleocr/models@1.0.0/ch_PP-OCRv4_det_infer.onnx',
-      rec: 'https://cdn.jsdelivr.net/npm/@paddleocr/models@1.0.0/ch_PP-OCRv4_rec_infer.onnx'
-    };
-
+    let worker = null;
     let stream = null;
-    let detSession = null;
-    let recSession = null;
 
     const installerOverlay = document.getElementById('installer-overlay');
     const btnInstall = document.getElementById('btn-install');
@@ -397,66 +382,26 @@
     const resultText = document.getElementById('result-text');
     const qrcodeEl = document.getElementById('qrcode');
 
-    // Fetch stream helper with accurate byte tracking
-    async function fetchWithProgress(url, stepLabel, basePercentage, weightPercentage) {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
-      const contentLength = response.headers.get('content-length');
-      const totalBytes = contentLength ? parseInt(contentLength, 10) : 4500000;
-      
-      const reader = response.body.getReader();
-      let receivedBytes = 0;
-      let chunks = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        chunks.push(value);
-        receivedBytes += value.length;
-
-        const currentStepProgress = receivedBytes / totalBytes;
-        const totalProgress = Math.min(Math.round(basePercentage + (currentStepProgress * weightPercentage)), 99);
-        
-        installStep.textContent = `${stepLabel} (${(receivedBytes / (1024 * 1024)).toFixed(1)}MB)`;
-        installPercent.textContent = `${totalProgress}%`;
-        installProgress.style.width = `${totalProgress}%`;
-      }
-
-      const allChunks = new Uint8Array(receivedBytes);
-      let position = 0;
-      for (let chunk of chunks) {
-        allChunks.set(chunk, position);
-        position += chunk.length;
-      }
-
-      return allChunks.buffer;
-    }
-
+    // First boot installer using Tesseract real-time logger events
     btnInstall.onclick = async () => {
       btnInstall.classList.add('hidden');
       installStatusContainer.classList.remove('hidden');
 
       try {
-        // Step 1: Download Detection Model (40% Weight)
-        const detBuffer = await fetchWithProgress(MODELS.det, 'Downloading Detection Model', 0, 40);
-
-        // Step 2: Download Recognition Model (40% Weight)
-        const recBuffer = await fetchWithProgress(MODELS.rec, 'Downloading Recognition Model', 40, 40);
-
-        // Step 3: Initialize ONNX Sessions (20% Weight)
-        installStep.textContent = 'Initializing WASM Runtime...';
-        installPercent.textContent = '85%';
-        installProgress.style.width = '85%';
-
-        ort.env.wasm.numThreads = 1;
-        detSession = await ort.InferenceSession.create(detBuffer, { executionProviders: ['wasm'] });
-        recSession = await ort.InferenceSession.create(recBuffer, { executionProviders: ['wasm'] });
-
-        installPercent.textContent = '100%';
-        installProgress.style.width = '100%';
-        installStep.textContent = 'Complete!';
+        worker = await Tesseract.createWorker('eng', 1, {
+          logger: m => {
+            if (m.status === 'downloading tesseract structure' || m.status === 'downloading traineddata') {
+              const pct = Math.round((m.progress || 0) * 100);
+              installStep.textContent = `${m.status} (${pct}%)`;
+              installPercent.textContent = `${pct}%`;
+              installProgress.style.width = `${pct}%`;
+            } else if (m.status === 'initializing api') {
+              installStep.textContent = 'Initializing engine...';
+              installPercent.textContent = '100%';
+              installProgress.style.width = '100%';
+            }
+          }
+        });
 
         setTimeout(() => {
           installerOverlay.classList.add('hidden');
@@ -465,9 +410,9 @@
 
       } catch (err) {
         console.error(err);
-        installStep.textContent = 'Download failed. Tap to retry.';
+        installStep.textContent = 'Setup failed. Check connection.';
         btnInstall.classList.remove('hidden');
-        btnInstall.textContent = 'Retry Download';
+        btnInstall.textContent = 'Retry Setup';
       }
     };
 
@@ -525,7 +470,7 @@
     cameraSelect.onchange = () => startCamera(cameraSelect.value);
 
     document.getElementById('btn-capture').onclick = () => {
-      if (!video.videoWidth || !detSession) return;
+      if (!video.videoWidth || !worker) return;
 
       const rawCanvas = document.createElement('canvas');
       rawCanvas.width = video.videoWidth;
@@ -540,92 +485,52 @@
       ocrLoader.classList.remove('hidden');
       overlayContainer.innerHTML = '';
 
-      capturedImage.onload = () => runInference(rawCanvas);
+      capturedImage.onload = () => runOCR(rawCanvas);
     };
 
-    async function runInference(canvas) {
+    async function runOCR(canvas) {
       try {
-        loaderStatus.textContent = 'Processing Image...';
+        loaderStatus.textContent = 'Scanning lines...';
+        const { data } = await worker.recognize(canvas);
         
-        // Fast horizontal text line chunking for instant screen target selection
-        const ctx = canvas.getContext('2d');
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const boxes = generateBoundingBoxes(imgData, canvas.width, canvas.height);
-
-        renderDetectedBoxes(boxes, canvas.width, canvas.height);
+        // Render precise bounding boxes for every detected text line
+        renderLines(data.lines || [], canvas.width, canvas.height);
       } catch (err) {
-        alert('Inference error.');
+        alert('OCR Processing failed.');
         console.error(err);
       } finally {
         ocrLoader.classList.add('hidden');
       }
     }
 
-    function generateBoundingBoxes(imgData, width, height) {
-      const data = imgData.data;
-      const rowLuma = new Float32Array(height);
-      
-      for (let y = 0; y < height; y++) {
-        let sum = 0;
-        for (let x = 0; x < width; x += 4) {
-          const idx = (y * width + x) * 4;
-          sum += (data[idx] * 0.299 + data[idx+1] * 0.587 + data[idx+2] * 0.114);
-        }
-        rowLuma[y] = sum / (width / 4);
-      }
-
-      // Find local text contrast bands
-      const boxes = [];
-      let inTextZone = false;
-      let startY = 0;
-      
-      for (let y = 1; y < height - 1; y++) {
-        const diff = Math.abs(rowLuma[y] - rowLuma[y-1]);
-        if (diff > 12 && !inTextZone) {
-          inTextZone = true;
-          startY = y;
-        } else if (diff <= 5 && inTextZone) {
-          if (y - startY > 15 && y - startY < 120) {
-            boxes.push({
-              x: Math.round(width * 0.1),
-              y: startY,
-              w: Math.round(width * 0.8),
-              h: y - startY
-            });
-          }
-          inTextZone = false;
-        }
-      }
-
-      return boxes;
-    }
-
-    function renderDetectedBoxes(boxes, imgWidth, imgHeight) {
+    function renderLines(lines, imgWidth, imgHeight) {
       overlayContainer.innerHTML = '';
       const rect = capturedImage.getBoundingClientRect();
       const scaleX = rect.width / imgWidth;
       const scaleY = rect.height / imgHeight;
 
-      boxes.forEach(b => {
+      lines.forEach(line => {
+        const text = line.text.trim();
+        if (!text) return;
+
+        const { x0, y0, x1, y1 } = line.bbox;
         const box = document.createElement('div');
         box.className = 'box-target';
-        box.style.left = `${b.x * scaleX}px`;
-        box.style.top = `${b.y * scaleY}px`;
-        box.style.width = `${b.w * scaleX}px`;
-        box.style.height = `${b.h * scaleY}px`;
+        box.style.left = `${x0 * scaleX}px`;
+        box.style.top = `${y0 * scaleY}px`;
+        box.style.width = `${(x1 - x0) * scaleX}px`;
+        box.style.height = `${(y1 - y0) * scaleY}px`;
 
-        box.onclick = () => selectBoxRegion(b);
+        box.onclick = () => selectText(text);
         overlayContainer.appendChild(box);
       });
     }
 
-    function selectBoxRegion(b) {
-      // Mock result output from selected crop region
-      const mockResultText = `RAW_DATA_${Math.floor(Math.random() * 899999 + 100000)}`;
+    function selectText(text) {
       selectView.classList.add('hidden');
       qrView.classList.remove('hidden');
-      resultText.textContent = mockResultText;
-      renderQRCode(mockResultText);
+      resultText.textContent = text;
+      renderQRCode(text);
     }
 
     function renderQRCode(text) {
