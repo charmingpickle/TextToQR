@@ -26,7 +26,6 @@
             -webkit-tap-highlight-color: transparent;
         }
         
-        /* Main App Container */
         #app {
             height: 100%;
             width: 100%;
@@ -35,7 +34,6 @@
             background: white;
         }
         
-        /* Header */
         #header {
             background: white;
             padding: 15px;
@@ -50,7 +48,6 @@
             font-weight: 600;
         }
         
-        /* Camera Frame Container */
         #cameraFrameContainer {
             flex: 1;
             padding: 15px;
@@ -62,7 +59,6 @@
             position: relative;
         }
         
-        /* Camera Frame */
         #cameraFrame {
             position: relative;
             width: 100%;
@@ -82,7 +78,6 @@
             display: block;
         }
         
-        /* Corner markers */
         .corner-marker {
             position: absolute;
             width: 30px;
@@ -125,7 +120,6 @@
             border-bottom-right-radius: 10px;
         }
         
-        /* Camera selector dropdown */
         #cameraSelector {
             position: absolute;
             top: 15px;
@@ -164,7 +158,6 @@
             font-weight: bold;
         }
         
-        /* Camera status */
         #cameraStatus {
             position: absolute;
             bottom: 15px;
@@ -178,7 +171,6 @@
             pointer-events: none;
         }
         
-        /* Controls Bar */
         #controlsBar {
             background: white;
             padding: 15px;
@@ -189,7 +181,6 @@
             gap: 15px;
         }
         
-        /* Zoom Controls */
         #zoomControls {
             display: flex;
             align-items: center;
@@ -231,7 +222,6 @@
             color: #333;
         }
         
-        /* Button Row */
         #buttonRow {
             display: flex;
             align-items: center;
@@ -299,7 +289,6 @@
             border-color: white;
         }
         
-        /* Processing Overlay */
         #processing {
             position: fixed;
             top: 0;
@@ -335,7 +324,6 @@
             font-weight: 500;
         }
         
-        /* Selection Screen */
         #selectionScreen {
             position: fixed;
             top: 0;
@@ -373,23 +361,39 @@
             background: #0056b3;
         }
         
-        #imageScroll {
+        #imageWrapper {
             flex: 1;
-            overflow: auto;
             position: relative;
+            overflow: auto;
             min-height: 0;
             background: #f8f8f8;
             padding: 15px;
         }
         
+        /* This is the key fix - image and overlay in same container */
+        #imageContainer {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        
         #processedImage {
             width: 100%;
+            height: auto;
             display: block;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
-        /* Text selection boxes */
+        #textOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
         .text-box {
             position: absolute;
             border: 2px solid #00ff00;
@@ -398,6 +402,7 @@
             transition: all 0.2s;
             min-height: 20px;
             border-radius: 3px;
+            pointer-events: auto;
         }
         
         .text-box:active {
@@ -411,7 +416,6 @@
             box-shadow: 0 0 10px #00ff00;
         }
         
-        /* Bottom Panel */
         #bottomPanel {
             flex-shrink: 0;
             background: white;
@@ -448,7 +452,6 @@
             height: auto;
         }
         
-        /* Notification */
         #notification {
             position: fixed;
             bottom: 180px;
@@ -466,35 +469,27 @@
     </style>
 </head>
 <body>
-    <!-- Main App -->
     <div id="app">
-        <!-- Header -->
         <div id="header">
             <h1>📸 BIOS Scanner</h1>
         </div>
         
-        <!-- Camera Frame Container -->
         <div id="cameraFrameContainer">
             <div id="cameraFrame">
                 <video id="cameraFeed" autoplay playsinline></video>
                 
-                <!-- Corner markers -->
                 <div class="corner-marker" id="corner-tl"></div>
                 <div class="corner-marker" id="corner-tr"></div>
                 <div class="corner-marker" id="corner-bl"></div>
                 <div class="corner-marker" id="corner-br"></div>
                 
-                <!-- Camera selector -->
                 <div id="cameraSelector"></div>
                 
-                <!-- Camera status -->
                 <div id="cameraStatus">Loading camera...</div>
             </div>
         </div>
         
-        <!-- Controls Bar -->
         <div id="controlsBar">
-            <!-- Zoom Controls -->
             <div id="zoomControls">
                 <button id="zoomOut">−</button>
                 <input type="range" id="zoomSlider" min="1" max="10" value="1" step="0.1">
@@ -502,7 +497,6 @@
                 <span id="zoomLevel">1.0x</span>
             </div>
             
-            <!-- Button Row -->
             <div id="buttonRow">
                 <button class="icon-btn" onclick="toggleCameraList()" title="Select Camera">📷</button>
                 <button id="shutterBtn" onclick="takePhoto()" title="Take Photo"></button>
@@ -511,13 +505,11 @@
         </div>
     </div>
     
-    <!-- Processing Overlay -->
     <div id="processing">
         <div class="spinner"></div>
         <div id="processingText">Processing...</div>
     </div>
     
-    <!-- Selection Screen -->
     <div id="selectionScreen">
         <div id="selectionHeader">
             <button onclick="retakePhoto()">📸 Retake</button>
@@ -525,9 +517,11 @@
             <button onclick="clearSelection()">Clear</button>
         </div>
         
-        <div id="imageScroll">
-            <img id="processedImage" alt="Processed Image">
-            <div id="textOverlay"></div>
+        <div id="imageWrapper">
+            <div id="imageContainer">
+                <img id="processedImage" alt="Processed Image">
+                <div id="textOverlay"></div>
+            </div>
         </div>
         
         <div id="bottomPanel">
@@ -538,7 +532,6 @@
         </div>
     </div>
     
-    <!-- Notification -->
     <div id="notification"></div>
     
     <script>
@@ -551,18 +544,13 @@
         let imageWidth = 0;
         let imageHeight = 0;
         
-        // Initialize camera
         async function initCamera() {
             try {
-                // Stop existing stream
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
                 }
                 
-                // Get camera list first
                 await listCameras(false);
-                
-                // Try to start with back camera
                 await startCamera(currentCameraIndex);
                 
             } catch (error) {
@@ -571,7 +559,6 @@
             }
         }
         
-        // List all cameras
         async function listCameras(showSelector = true) {
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
@@ -590,7 +577,6 @@
             }
         }
         
-        // Display camera selector
         function displayCameraSelector() {
             const selector = document.getElementById('cameraSelector');
             selector.innerHTML = '';
@@ -615,7 +601,6 @@
             selector.style.display = 'block';
         }
         
-        // Toggle camera list
         function toggleCameraList() {
             const selector = document.getElementById('cameraSelector');
             if (selector.style.display === 'none' || selector.style.display === '') {
@@ -625,14 +610,12 @@
             }
         }
         
-        // Switch to specific camera
         async function switchToCamera(index) {
             currentCameraIndex = index;
             await startCamera(index);
             document.getElementById('cameraSelector').style.display = 'none';
         }
         
-        // Start camera with specific index
         async function startCamera(index) {
             try {
                 if (stream) {
@@ -642,7 +625,6 @@
                 let constraints;
                 
                 if (index >= 0 && cameras[index]) {
-                    // Use specific camera
                     constraints = {
                         video: {
                             deviceId: { exact: cameras[index].deviceId },
@@ -652,7 +634,6 @@
                         audio: false
                     };
                 } else {
-                    // Default to back camera
                     constraints = {
                         video: {
                             facingMode: 'environment',
@@ -666,12 +647,10 @@
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                // Update status
                 const track = stream.getVideoTracks()[0];
                 const label = track.label || 'Camera';
                 document.getElementById('cameraStatus').textContent = `📷 ${label}`;
                 
-                // Get zoom capabilities
                 const capabilities = track.getCapabilities();
                 if (capabilities.zoom) {
                     document.getElementById('zoomSlider').max = capabilities.zoom.max;
@@ -680,7 +659,6 @@
             } catch (error) {
                 console.error('Start camera error:', error);
                 
-                // Fallback to simple
                 try {
                     stream = await navigator.mediaDevices.getUserMedia({ video: true });
                     video.srcObject = stream;
@@ -691,7 +669,6 @@
             }
         }
         
-        // Toggle flash
         async function toggleFlash() {
             try {
                 if (stream) {
@@ -704,7 +681,6 @@
                             advanced: [{ torch: flashOn }]
                         });
                         
-                        document.querySelector('#buttonRow .icon-btn:last-child').classList.toggle('active', flashOn);
                         showNotification(flashOn ? 'Flash ON' : 'Flash OFF');
                     } else {
                         showNotification('No flash on this camera');
@@ -715,7 +691,6 @@
             }
         }
         
-        // Zoom controls
         document.getElementById('zoomIn').addEventListener('click', () => {
             setZoom(currentZoom + 0.5);
         });
@@ -741,7 +716,6 @@
                             advanced: [{ zoom: currentZoom }]
                         });
                     } else {
-                        // Digital zoom
                         const scale = currentZoom;
                         video.style.transform = `scale(${scale})`;
                     }
@@ -755,32 +729,25 @@
             }
         }
         
-        // Take photo
         async function takePhoto() {
             try {
-                // Show processing
                 document.getElementById('processing').style.display = 'flex';
                 document.getElementById('processingText').textContent = 'Capturing...';
                 
-                // Create canvas from video
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0);
                 
-                // Process image
                 document.getElementById('processingText').textContent = 'Processing image...';
                 const processedCanvas = await processImage(canvas);
                 
-                // Run OCR
                 document.getElementById('processingText').textContent = 'Reading text...';
                 const ocrData = await runOCR(processedCanvas);
                 
-                // Show selection screen
                 showSelectionScreen(processedCanvas, ocrData);
                 
-                // Hide processing
                 document.getElementById('processing').style.display = 'none';
                 
             } catch (error) {
@@ -790,13 +757,11 @@
             }
         }
         
-        // Process image to black and white
         async function processImage(canvas) {
             const ctx = canvas.getContext('2d');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
             
-            // Convert to grayscale with threshold
             for (let i = 0; i < data.length; i += 4) {
                 const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
                 const bw = gray > 140 ? 255 : 0;
@@ -807,7 +772,6 @@
             
             ctx.putImageData(imageData, 0, 0);
             
-            // Upscale for better OCR
             const scale = 2;
             const upscaled = document.createElement('canvas');
             upscaled.width = canvas.width * scale;
@@ -819,7 +783,6 @@
             return upscaled;
         }
         
-        // Run OCR
         async function runOCR(canvas) {
             try {
                 const result = await Tesseract.recognize(
@@ -838,68 +801,87 @@
             }
         }
         
-        // Show selection screen
         function showSelectionScreen(canvas, ocrData) {
-            // Save dimensions
             imageWidth = canvas.width;
             imageHeight = canvas.height;
             
-            // Hide camera
             document.getElementById('app').style.display = 'none';
-            
-            // Show selection screen
             document.getElementById('selectionScreen').style.display = 'flex';
             
-            // Set image
             const img = document.getElementById('processedImage');
             img.src = canvas.toDataURL();
             
-            // Clear previous boxes
-            document.getElementById('textOverlay').innerHTML = '';
-            
-            // Create clickable text boxes from OCR words
-            if (ocrData && ocrData.words) {
-                createTextBoxes(ocrData.words);
-            }
+            // Wait for image to load before positioning boxes
+            img.onload = () => {
+                document.getElementById('textOverlay').innerHTML = '';
+                
+                if (ocrData && ocrData.words) {
+                    createTextBoxes(ocrData.words);
+                }
+            };
         }
         
-        // Create clickable text boxes
         function createTextBoxes(words) {
             const overlay = document.getElementById('textOverlay');
-            overlay.style.position = 'relative';
-            overlay.style.marginTop = '-100%';
+            
+            // Filter words with good confidence
+            const goodWords = words.filter(word => word.confidence > 30);
+            
+            console.log('Total words:', words.length, 'Good words:', goodWords.length);
             
             // Group words into lines
-            const lines = groupWordsIntoLines(words);
+            const lines = groupWordsIntoLines(goodWords);
+            
+            console.log('Lines found:', lines.length);
             
             lines.forEach((line, index) => {
                 if (line.text.trim().length < 3) return;
                 
                 const box = document.createElement('div');
                 box.className = 'text-box';
-                box.style.position = 'absolute';
-                box.style.left = (line.x / imageWidth * 100) + '%';
-                box.style.top = (line.y / imageHeight * 100) + '%';
-                box.style.width = (line.width / imageWidth * 100) + '%';
-                box.style.height = (line.height / imageHeight * 100) + '%';
-                box.style.minHeight = '15px';
                 
-                box.addEventListener('click', () => selectText(line.text, box));
+                // Convert pixel coordinates to percentages
+                const leftPercent = (line.x / imageWidth) * 100;
+                const topPercent = (line.y / imageHeight) * 100;
+                const widthPercent = (line.width / imageWidth) * 100;
+                const heightPercent = (line.height / imageHeight) * 100;
+                
+                box.style.left = leftPercent + '%';
+                box.style.top = topPercent + '%';
+                box.style.width = widthPercent + '%';
+                box.style.height = Math.max(heightPercent, 3) + '%';
+                
+                // Store text as data attribute
+                box.dataset.text = line.text;
+                
+                box.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectText(line.text, box);
+                });
                 
                 overlay.appendChild(box);
+                
+                console.log(`Box ${index}: "${line.text}" at ${leftPercent.toFixed(1)}%, ${topPercent.toFixed(1)}%`);
             });
+            
+            if (lines.length === 0) {
+                showNotification('No text detected. Try closer photo.');
+            }
         }
         
-        // Group words into lines
         function groupWordsIntoLines(words) {
             const lines = [];
             let currentLine = null;
             
-            words.forEach(word => {
+            // Sort words by vertical position
+            const sortedWords = words.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+            
+            sortedWords.forEach(word => {
                 const y = word.bbox.y0;
                 const height = word.bbox.y1 - word.bbox.y0;
                 
                 if (!currentLine || Math.abs(y - currentLine.y) > height * 0.5) {
+                    // New line
                     currentLine = {
                         text: word.text,
                         x: word.bbox.x0,
@@ -909,6 +891,7 @@
                     };
                     lines.push(currentLine);
                 } else {
+                    // Same line
                     currentLine.text += ' ' + word.text;
                     currentLine.width = word.bbox.x1 - currentLine.x;
                     currentLine.height = Math.max(currentLine.height, word.bbox.y1 - word.bbox.y0);
@@ -918,7 +901,6 @@
             return lines;
         }
         
-        // Select text
         async function selectText(text, element) {
             try {
                 const cleanText = text.trim();
@@ -927,7 +909,6 @@
                 
                 document.getElementById('selectedText').textContent = cleanText;
                 
-                // Highlight selected box
                 document.querySelectorAll('.text-box').forEach(box => {
                     box.classList.remove('selected');
                 });
@@ -936,7 +917,6 @@
                     element.classList.add('selected');
                 }
                 
-                // Generate QR code
                 const qrContainer = document.getElementById('qrContainer');
                 qrContainer.style.display = 'block';
                 
@@ -947,7 +927,6 @@
                     errorCorrectionLevel: 'H'
                 });
                 
-                // Copy to clipboard
                 try {
                     await navigator.clipboard.writeText(cleanText);
                     showNotification('Copied: ' + cleanText);
@@ -964,7 +943,6 @@
             }
         }
         
-        // Clear selection
         function clearSelection() {
             document.getElementById('selectedText').textContent = 'Tap on text in the image';
             document.getElementById('qrContainer').style.display = 'none';
@@ -973,7 +951,6 @@
             });
         }
         
-        // Retake photo
         function retakePhoto() {
             document.getElementById('selectionScreen').style.display = 'none';
             document.getElementById('app').style.display = 'flex';
@@ -984,7 +961,6 @@
             }, 100);
         }
         
-        // Show notification
         function showNotification(message) {
             const notification = document.getElementById('notification');
             notification.textContent = message;
@@ -995,7 +971,6 @@
             }, 2000);
         }
         
-        // Initialize on page load
         window.addEventListener('DOMContentLoaded', () => {
             initCamera();
         });
