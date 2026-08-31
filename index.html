@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BIOS Scanner</title>
     
-    <!-- PaddleOCR and QR Code libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/paddleocr.js@1.0.0/dist/paddleocr.min.js"></script>
+    <!-- Tesseract.js and QR Code -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     
     <style>
@@ -223,7 +223,7 @@
         
         #processingText { color: #333; font-size: 16px; font-weight: 500; }
         
-        #selectionScreen {
+        #textSelectionScreen {
             position: fixed;
             top: 0;
             left: 0;
@@ -235,7 +235,7 @@
             z-index: 50;
         }
         
-        #selectionHeader {
+        #textSelectionHeader {
             flex-shrink: 0;
             padding: 15px;
             background: white;
@@ -245,7 +245,7 @@
             border-bottom: 2px solid #e0e0e0;
         }
         
-        #selectionHeader button {
+        #textSelectionHeader button {
             padding: 10px 15px;
             border: none;
             border-radius: 8px;
@@ -256,50 +256,44 @@
             cursor: pointer;
         }
         
-        #imageWrapper {
+        #textList {
             flex: 1;
-            position: relative;
-            overflow: auto;
-            min-height: 0;
-            background: #f8f8f8;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .text-item {
+            background: white;
             padding: 15px;
-        }
-        
-        #imageContainer {
-            position: relative;
-            display: inline-block;
-            width: 100%;
-        }
-        
-        #processedImage {
-            width: 100%;
-            height: auto;
-            display: block;
-            border-radius: 8px;
-        }
-        
-        #textOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        
-        .text-box {
-            position: absolute;
-            border: 2px solid #00ff00;
-            background: rgba(0, 255, 0, 0.2);
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
             cursor: pointer;
             transition: all 0.2s;
-            min-height: 20px;
-            border-radius: 3px;
-            pointer-events: auto;
         }
         
-        .text-box:active {
-            background: rgba(0, 255, 0, 0.4);
+        .text-item:active {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        .text-item .label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        .text-item .value {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .text-item.highlight {
+            border-color: #28a745;
+            background: #f0fff4;
         }
         
         #qrScreen {
@@ -424,19 +418,14 @@
         <div id="processingText">Processing...</div>
     </div>
     
-    <div id="selectionScreen">
-        <div id="selectionHeader">
+    <div id="textSelectionScreen">
+        <div id="textSelectionHeader">
             <button onclick="retakePhoto()">📸 Retake</button>
-            <span style="color:#333; font-weight:bold;">Tap Text to Select</span>
+            <span style="color:#333; font-weight:bold;">Select Text to Generate QR</span>
             <span></span>
         </div>
         
-        <div id="imageWrapper">
-            <div id="imageContainer">
-                <img id="processedImage" alt="Processed Image">
-                <div id="textOverlay"></div>
-            </div>
-        </div>
+        <div id="textList"></div>
     </div>
     
     <div id="qrScreen">
@@ -458,25 +447,6 @@
         let cameras = [];
         let flashOn = false;
         let currentZoom = 1;
-        let imageWidth = 0;
-        let imageHeight = 0;
-        let paddleOCR = null;
-        
-        // Initialize PaddleOCR
-        async function initPaddleOCR() {
-            try {
-                paddleOCR = new PaddleOCR({
-                    lang: 'en',
-                    det: true,
-                    rec: true,
-                    cls: false
-                });
-                await paddleOCR.init();
-                console.log('PaddleOCR initialized');
-            } catch (error) {
-                console.error('PaddleOCR init failed:', error);
-            }
-        }
         
         async function initCamera() {
             try {
@@ -617,10 +587,10 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0);
                 
-                document.getElementById('processingText').textContent = 'Processing with PaddleOCR...';
-                const results = await runPaddleOCR(canvas);
+                document.getElementById('processingText').textContent = 'Reading text...';
+                const text = await runOCR(canvas);
                 
-                showSelectionScreen(canvas, results);
+                showTextSelection(text);
                 
                 document.getElementById('processing').style.display = 'none';
             } catch (error) {
@@ -630,110 +600,107 @@
             }
         }
         
-        async function runPaddleOCR(canvas) {
+        async function runOCR(canvas) {
             try {
-                if (!paddleOCR) {
-                    await initPaddleOCR();
-                }
+                // Multiple OCR passes with different settings
+                const results = [];
                 
-                // Convert canvas to image data
-                const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                // Pass 1: Standard
+                const result1 = await Tesseract.recognize(canvas, 'eng', {
+                    tessedit_pageseg_mode: '6',
+                    preserve_interword_spaces: '1'
+                });
+                results.push(result1.data.text);
                 
-                // Run PaddleOCR
-                const results = await paddleOCR.recognize(imageData);
+                // Pass 2: Sparse text
+                const result2 = await Tesseract.recognize(canvas, 'eng', {
+                    tessedit_pageseg_mode: '11',
+                    preserve_interword_spaces: '1'
+                });
+                results.push(result2.data.text);
                 
-                console.log('PaddleOCR results:', results);
+                // Combine results
+                const combinedText = [...new Set(results.join('\n').split('\n'))].join('\n');
                 
-                return results;
+                return combinedText;
             } catch (error) {
-                console.error('PaddleOCR error:', error);
-                return null;
+                console.error('OCR error:', error);
+                return '';
             }
         }
         
-        function showSelectionScreen(canvas, ocrResults) {
-            imageWidth = canvas.width;
-            imageHeight = canvas.height;
-            
+        function showTextSelection(ocrText) {
             document.getElementById('app').style.display = 'none';
-            document.getElementById('selectionScreen').style.display = 'flex';
+            document.getElementById('textSelectionScreen').style.display = 'flex';
             
-            const img = document.getElementById('processedImage');
-            img.src = canvas.toDataURL();
+            const textList = document.getElementById('textList');
+            textList.innerHTML = '';
             
-            img.onload = () => {
-                document.getElementById('textOverlay').innerHTML = '';
+            // Split into lines and filter
+            const lines = ocrText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            
+            // Remove duplicates
+            const uniqueLines = [...new Set(lines)];
+            
+            // Categorize each line
+            uniqueLines.forEach(line => {
+                const item = document.createElement('div');
+                item.className = 'text-item';
                 
-                if (ocrResults && ocrResults.texts && ocrResults.texts.length > 0) {
-                    createTextBoxes(ocrResults);
-                } else {
-                    showNotification('No text detected. Try again.');
+                let label = 'Text';
+                if (isSerialNumber(line)) {
+                    label = 'Serial Number';
+                    item.classList.add('highlight');
+                } else if (isMACAddress(line)) {
+                    label = 'MAC Address';
+                    item.classList.add('highlight');
+                } else if (line.includes('Serial') || line.includes('S/N') || line.includes('Service Tag')) {
+                    label = 'Serial Number';
+                    item.classList.add('highlight');
+                } else if (line.includes('MAC') || line.includes('Address')) {
+                    label = 'MAC Address';
+                    item.classList.add('highlight');
                 }
-            };
+                
+                item.innerHTML = `
+                    <div class="label">${label}</div>
+                    <div class="value">${line}</div>
+                `;
+                
+                item.onclick = () => showQRCode(line);
+                
+                textList.appendChild(item);
+            });
+            
+            if (uniqueLines.length === 0) {
+                textList.innerHTML = '<p style="text-align:center; color:#666; margin-top:50px;">No text detected. Try taking another photo.</p>';
+            }
         }
         
-        function createTextBoxes(ocrResults) {
-            const overlay = document.getElementById('textOverlay');
-            
-            ocrResults.texts.forEach((item, index) => {
-                if (!item.text || item.text.trim().length < 1) return;
-                
-                const box = document.createElement('div');
-                box.className = 'text-box';
-                
-                // PaddleOCR provides points array [x1,y1,x2,y2,x3,y3,x4,y4]
-                const points = item.points || [];
-                let left, top, width, height;
-                
-                if (points.length === 8) {
-                    // Calculate bounding box from points
-                    const xs = [points[0], points[2], points[4], points[6]];
-                    const ys = [points[1], points[3], points[5], points[7]];
-                    const minX = Math.min(...xs);
-                    const maxX = Math.max(...xs);
-                    const minY = Math.min(...ys);
-                    const maxY = Math.max(...ys);
-                    
-                    left = (minX / imageWidth) * 100;
-                    top = (minY / imageHeight) * 100;
-                    width = ((maxX - minX) / imageWidth) * 100;
-                    height = ((maxY - minY) / imageHeight) * 100;
-                } else {
-                    // Fallback - skip if no coordinates
-                    return;
-                }
-                
-                box.style.left = left + '%';
-                box.style.top = top + '%';
-                box.style.width = Math.max(width, 2) + '%';
-                box.style.height = Math.max(height, 2) + '%';
-                box.style.minHeight = '15px';
-                
-                const cleanText = item.text.trim();
-                box.dataset.text = cleanText;
-                box.title = cleanText;
-                
-                box.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    showQRCode(cleanText);
-                });
-                
-                overlay.appendChild(box);
-            });
+        function isSerialNumber(text) {
+            // Match patterns like 5CD4345W4V
+            return /^[A-Z0-9]{7,}$/.test(text) && 
+                   /[A-Z]/.test(text) && 
+                   /\d/.test(text);
+        }
+        
+        function isMACAddress(text) {
+            // Match MAC address patterns
+            return /^([0-9A-F]{2}[:-]){5}[0-9A-F]{2}$/i.test(text) ||
+                   /^([0-9A-F]{4}\.){2}[0-9A-F]{4}$/i.test(text);
         }
         
         async function showQRCode(text) {
             const cleanText = text.trim();
             if (!cleanText) return;
             
-            // Show QR screen
-            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('textSelectionScreen').style.display = 'none';
             document.getElementById('qrScreen').style.display = 'flex';
             
-            // Display the selected text
             document.getElementById('qrValueDisplay').textContent = cleanText;
             
-            // Generate QR code
             const qrCanvas = document.getElementById('qrCanvas');
             await QRCode.toCanvas(qrCanvas, cleanText, {
                 width: 300,
@@ -741,7 +708,6 @@
                 errorCorrectionLevel: 'H'
             });
             
-            // Copy to clipboard
             try {
                 await navigator.clipboard.writeText(cleanText);
                 showNotification('Copied to clipboard!');
@@ -752,11 +718,11 @@
         
         function chooseAnother() {
             document.getElementById('qrScreen').style.display = 'none';
-            document.getElementById('selectionScreen').style.display = 'flex';
+            document.getElementById('textSelectionScreen').style.display = 'flex';
         }
         
         function retakePhoto() {
-            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('textSelectionScreen').style.display = 'none';
             document.getElementById('qrScreen').style.display = 'none';
             document.getElementById('app').style.display = 'flex';
             
@@ -775,7 +741,6 @@
         }
         
         window.addEventListener('DOMContentLoaded', () => {
-            initPaddleOCR();
             initCamera();
         });
     </script>
