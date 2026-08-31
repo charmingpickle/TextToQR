@@ -3,137 +3,293 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Offline BIOS Reader</title>
-  
+  <title>BIOS Tap → QR (Offline AI)</title>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <style>
     :root {
-      --bg: #09090b;
-      --surface: #18181b;
-      --accent: #2563eb;
-      --border: #3f3f46;
-      --text: #f4f4f5;
-      --muted: #a1a1aa;
+      --bg-main: #09090b;
+      --bg-surface: #18181b;
+      --bg-card: #27272a;
+      --accent-color: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --border-color: #3f3f46;
+      --box-highlight: rgba(59, 130, 246, 0.35);
+      --box-border: #60a5fa;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100dvh; display: flex; flex-direction: column; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-    /* INSTALL BANNER */
     .install-banner {
       background: #1e3a8a;
-      border-bottom: 1px solid var(--accent);
-      padding: 12px 16px;
-      font-size: 0.85rem;
+      border-bottom: 1px solid var(--accent-color);
+      padding: 10px 14px;
+      font-size: 0.8rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-    .install-banner span { color: #dbeafe; }
-    .close-banner { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
-
-    /* VIEWPORT & SCANNER */
-    .viewport { position: relative; flex: 1; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    video { width: 100%; height: 100%; object-fit: contain; }
-    
-    .target-box {
-      position: absolute; width: 85%; height: 70px;
-      border: 2px solid var(--accent); border-radius: 8px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.65);
-      pointer-events: none; display: flex; align-items: center; justify-content: center;
-    }
-    .target-box::after {
-      content: "ALIGN LINE HERE"; color: #fff; font-size: 0.7rem; font-weight: 700;
-      letter-spacing: 1px; background: var(--accent); padding: 2px 8px; border-radius: 4px;
-      position: absolute; top: -20px;
+      z-index: 30;
     }
 
-    /* DOWNLOAD OVERLAY & PROGRESS BAR */
-    .setup-overlay {
-      position: absolute; inset: 0; background: rgba(9, 9, 11, 0.95);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 30px; z-index: 10; gap: 16px; text-align: center;
+    .view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      width: 100%; height: 100dvh;
+      overflow: hidden;
     }
-    .progress-container { width: 100%; max-width: 300px; background: var(--border); height: 12px; border-radius: 6px; overflow: hidden; }
-    .progress-bar { width: 0%; height: 100%; background: var(--accent); transition: width 0.2s ease; }
 
-    /* INTERFACE CONTROLS */
-    .controls { padding: 20px; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; align-items: center; }
-    button.btn-capture {
-      width: 100%; max-width: 320px; background: var(--accent); color: white; border: none;
-      padding: 14px; border-radius: 10px; font-weight: 600; font-size: 1rem; cursor: pointer;
+    .viewport {
+      flex: 1;
+      position: relative;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
     }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    #result-container { display: none; width: 100%; max-width: 320px; margin-top: 10px; flex-direction: column; align-items: center; gap: 10px; }
-    #result-text { font-family: monospace; font-size: 1.1rem; color: #fff; background: var(--bg); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); width: 100%; word-break: break-all; }
-    #qrcode { background: #fff; padding: 12px; border-radius: 12px; }
+    video, #captured-image {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+
+    .view-finder {
+      position: absolute;
+      width: 85%; height: 55%;
+      border: 2px dashed rgba(255, 255, 255, 0.4);
+      border-radius: 16px;
+      pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding-top: 12px;
+    }
+
+    .view-finder::after {
+      content: "Position BIOS text inside frame";
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.8rem; font-weight: 600;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 6px 14px; border-radius: 20px;
+    }
+
+    #overlay-container {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: auto;
+    }
+
+    .box-target {
+      position: absolute;
+      border: 1.5px solid var(--box-border);
+      background: var(--box-highlight);
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+    }
+
+    .box-target:active {
+      background: rgba(59, 130, 246, 0.75);
+      border-color: #ffffff;
+    }
+
+    /* DOWNLOAD & PROCESSING OVERLAY */
+    .loader-overlay {
+      position: absolute; inset: 0;
+      background: rgba(9, 9, 11, 0.92);
+      backdrop-filter: blur(8px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 20; gap: 16px; text-align: center; padding: 20px;
+    }
+
+    .progress-container { width: 100%; max-width: 260px; background: var(--border-color); height: 10px; border-radius: 5px; overflow: hidden; }
+    .progress-bar { width: 0%; height: 100%; background: var(--accent-color); transition: width 0.15s ease; }
+
+    .control-bar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 24px 32px 40px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+      z-index: 10;
+    }
+
+    .shutter-btn {
+      width: 80px; height: 80px; border-radius: 50%;
+      border: 4px solid #fff; background: transparent;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .shutter-btn-inner { width: 62px; height: 62px; border-radius: 50%; background: #fff; }
+
+    .icon-btn {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);
+      color: white; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+    }
+
+    .view-header {
+      padding: 18px 20px; background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      text-align: center; font-weight: 600; font-size: 1.05rem;
+    }
+
+    .action-bar {
+      padding: 16px 20px 28px; background: var(--bg-surface);
+      border-top: 1px solid var(--border-color); display: flex; gap: 12px;
+    }
+
+    button.btn {
+      flex: 1; background: var(--accent-color); color: white;
+      border: none; padding: 14px 20px; border-radius: 12px;
+      font-size: 1rem; font-weight: 600; cursor: pointer;
+    }
+    button.btn-secondary { background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); }
+
+    #qr-container-view {
+      flex: 1; overflow-y: auto; padding: 32px 24px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+    }
+
+    .qr-card { background: #ffffff; padding: 20px; border-radius: 20px; }
+
+    .text-editor-card {
+      width: 100%; max-width: 360px; background: var(--bg-surface);
+      border: 1px solid var(--border-color); border-radius: 16px; padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+
+    #result-text {
+      font-family: ui-monospace, monospace; font-size: 1.15rem; color: var(--text-main);
+      outline: none; word-break: break-all; min-height: 1.5em; user-select: text;
+    }
+
     .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-  <!-- STEP 1: INSTALLATION INSTRUCTIONS BANNER -->
+  <!-- PWA INSTALL BANNER -->
   <div id="install-banner" class="install-banner">
-    <span>💡 <strong>Save as App:</strong> Tap <strong>Share/Menu</strong> & select <strong>"Add to Home Screen"</strong> to run offline.</span>
-    <button class="close-banner" onclick="document.getElementById('install-banner').classList.add('hidden')">✕</button>
+    <span>💡 <strong>Save App:</strong> Tap <strong>Share/Menu</strong> $\rightarrow$ <strong>"Add to Home Screen"</strong> for offline use.</span>
+    <button onclick="document.getElementById('install-banner').classList.add('hidden')" style="background:none;border:none;color:white;">✕</button>
   </div>
 
-  <div class="viewport">
-    <video id="video" autoplay playsinline muted></video>
-    <div class="target-box"></div>
+  <!-- CAMERA VIEW -->
+  <div id="camera-view" class="view">
+    <div class="viewport">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="view-finder"></div>
 
-    <!-- STEP 2: ONBOARDING MODEL DOWNLOAD OVERLAY -->
-    <div id="setup-overlay" class="setup-overlay">
-      <h3>First-Time Setup</h3>
-      <p style="font-size: 0.85rem; color: var(--muted);">Downloading offline AI model to browser storage...</p>
-      
-      <div class="progress-container">
-        <div id="progress-bar" class="progress-bar"></div>
+      <!-- INITIAL MODEL DOWNLOAD OVERLAY -->
+      <div id="download-overlay" class="loader-overlay">
+        <h3 style="font-size:1.1rem;">First-Time Model Setup</h3>
+        <p style="font-size:0.8rem; color: var(--text-muted);">Downloading vision OCR to browser storage (~14MB)...</p>
+        <div class="progress-container">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <div id="progress-text" style="font-size: 0.8rem; font-weight: bold;">0%</div>
       </div>
-      <div id="progress-text" style="font-size: 0.8rem; font-weight: bold;">0%</div>
+    </div>
+    
+    <div class="control-bar">
+      <button class="icon-btn" id="btn-switch">⟳</button>
+      <button class="shutter-btn" id="btn-capture" disabled>
+        <div class="shutter-btn-inner"></div>
+      </button>
+      <div style="width: 48px;"></div>
     </div>
   </div>
 
-  <!-- STEP 3: READY APP CONTROLS -->
-  <div class="controls">
-    <button id="btn-capture" class="btn-capture" disabled>Initialising Setup...</button>
-    
-    <div id="result-container">
-      <div id="result-text" contenteditable="true"></div>
-      <div id="qrcode"></div>
+  <!-- SELECT VIEW -->
+  <div id="select-view" class="view hidden">
+    <div class="view-header" id="select-status">Tap target text to generate QR</div>
+    <div class="viewport" id="select-viewport">
+      <img id="captured-image" alt="Captured BIOS" />
+      <div id="overlay-container"></div>
+      
+      <!-- INFERENCE RUNNING OVERLAY -->
+      <div id="ocr-loader" class="loader-overlay hidden">
+        <div style="font-weight: 600;">Running Local Vision AI...</div>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button id="btn-retake" class="btn btn-secondary">Retake Photo</button>
+    </div>
+  </div>
+
+  <!-- QR OUTPUT VIEW -->
+  <div id="qr-view" class="view hidden">
+    <div class="view-header">Generated QR Code</div>
+    <div id="qr-container-view">
+      <div class="qr-card">
+        <div id="qrcode"></div>
+      </div>
+      <div class="text-editor-card">
+        <label style="font-size: 0.75rem; color: var(--text-muted); font-weight:700;">Extracted Text (Tap to edit)</label>
+        <div id="result-text" contenteditable="true" spellcheck="false"></div>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button id="btn-pick-another" class="btn btn-secondary">Select Another Line</button>
+      <button id="btn-new-photo" class="btn">New Photo</button>
     </div>
   </div>
 
   <script type="module">
     import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
-    // Enable automatic Web Cache / IndexedDB persistence
+    // Store model weights persistently in browser cache / IndexedDB
     env.allowLocalModels = false;
     env.useBrowserCache = true;
 
     const video = document.getElementById('video');
-    const setupOverlay = document.getElementById('setup-overlay');
+    const cameraView = document.getElementById('camera-view');
+    const selectView = document.getElementById('select-view');
+    const qrView = document.getElementById('qr-view');
+    const capturedImage = document.getElementById('captured-image');
+    const overlayContainer = document.getElementById('overlay-container');
+    const ocrLoader = document.getElementById('ocr-loader');
+    const downloadOverlay = document.getElementById('download-overlay');
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     const btnCapture = document.getElementById('btn-capture');
-    const resultContainer = document.getElementById('result-container');
     const resultText = document.getElementById('result-text');
     const qrcodeEl = document.getElementById('qrcode');
+    const selectStatus = document.getElementById('select-status');
 
+    let stream = null;
+    let devices = [];
+    let currentDeviceIdx = 0;
     let ocrPipeline = null;
 
-    // Start native camera feed
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 } } })
-      .then(stream => { video.srcObject = stream; })
-      .catch(err => alert("Camera permission required."));
-
-    // Download AI weights with progress tracking
-    async function initModel() {
+    async function initApp() {
       try {
-        ocrPipeline = await pipeline('image-to-text', 'Xenova/trocr-small-printed', {
-          device: 'webgpu',
+        devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+        await startCamera({ facingMode: { ideal: 'environment' } });
+      } catch (e) {
+        alert('Camera permission required.');
+      }
+
+      // Download lightweight PP-OCR detection & recognition model (~14MB total)
+      try {
+        ocrPipeline = await pipeline('image-to-text', 'Xenova/pp-ocrv4-onnx', {
           progress_callback: (data) => {
             if (data.status === 'progress') {
               const p = Math.round(data.progress || 0);
@@ -142,74 +298,140 @@
             }
           }
         });
-
-        // Hide download overlay once model binary is stored locally
-        setupOverlay.classList.add('hidden');
-        btnCapture.textContent = "Scan Selected Area";
+        
+        downloadOverlay.classList.add('hidden');
         btnCapture.disabled = false;
       } catch (err) {
-        console.warn("WebGPU unavailable, falling back to WebAssembly:", err);
-        // Fallback execution engine
-        ocrPipeline = await pipeline('image-to-text', 'Xenova/trocr-small-printed', {
-          progress_callback: (data) => {
-            if (data.status === 'progress') {
-              const p = Math.round(data.progress || 0);
-              progressBar.style.width = `${p}%`;
-              progressText.textContent = `${p}%`;
-            }
-          }
-        });
-        setupOverlay.classList.add('hidden');
-        btnCapture.textContent = "Scan Selected Area";
-        btnCapture.disabled = false;
+        console.error("Model initialization failed:", err);
       }
     }
 
-    initModel();
+    async function startCamera(constraints) {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, ...constraints },
+        audio: false
+      });
+      video.srcObject = stream;
+    }
 
-    // Perform Local Execution
-    btnCapture.onclick = async () => {
-      if (!ocrPipeline) return;
+    document.getElementById('btn-switch').onclick = () => {
+      if (devices.length < 2) return;
+      currentDeviceIdx = (currentDeviceIdx + 1) % devices.length;
+      startCamera({ deviceId: { exact: devices[currentDeviceIdx].deviceId } });
+    };
 
-      btnCapture.textContent = "Analyzing...";
-      btnCapture.disabled = true;
+    document.getElementById('btn-capture').onclick = () => {
+      if (!video.videoWidth) return;
 
-      // Create cropped slice corresponding to the alignment reticle
-      const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 90;
-      const ctx = canvas.getContext('2d');
+      const rawCanvas = document.createElement('canvas');
+      rawCanvas.width = video.videoWidth;
+      rawCanvas.height = video.videoHeight;
+      rawCanvas.getContext('2d').drawImage(video, 0, 0);
 
-      const vW = video.videoWidth;
-      const vH = video.videoHeight;
-      
-      // Crop central area matching reticle box
-      ctx.drawImage(video, vW * 0.075, vH * 0.42, vW * 0.85, vH * 0.16, 0, 0, 400, 90);
+      capturedImage.src = rawCanvas.toDataURL('image/jpeg', 0.95);
 
-      const dataUrl = canvas.toDataURL('image/png');
-      
+      cameraView.classList.add('hidden');
+      selectView.classList.remove('hidden');
+      ocrLoader.classList.remove('hidden');
+      overlayContainer.innerHTML = '';
+      selectStatus.textContent = "Analyzing Screen...";
+
+      capturedImage.onload = () => runOCR(rawCanvas);
+    };
+
+    async function runOCR(rawCanvas) {
       try {
-        const output = await ocrPipeline(dataUrl);
-        const parsed = (output[0]?.generated_text || '').replace(/[^A-Za-z0-9:-]/g, '').trim();
-
-        resultContainer.style.display = 'flex';
-        resultText.textContent = parsed || "RETRY_ALIGNMENT";
+        const dataUrl = rawCanvas.toDataURL('image/png');
         
-        // Generate QR code
-        qrcodeEl.innerHTML = '';
-        new QRCode(qrcodeEl, { text: parsed || "RETRY", width: 160, height: 160 });
-      } catch (e) {
-        alert("Scan failed. Ensure text is clearly framed inside target.");
+        // Fast single-pass prediction (Does not lock thread or crash mobile tab)
+        const results = await ocrPipeline(dataUrl);
+        
+        selectStatus.textContent = "Tap desired text line to convert";
+        renderLineBoxes(results || [], rawCanvas.width, rawCanvas.height);
+      } catch (err) {
+        alert('AI processing failed. Retake photo.');
+        console.error(err);
       } finally {
-        btnCapture.textContent = "Scan Selected Area";
-        btnCapture.disabled = false;
+        ocrLoader.classList.add('hidden');
       }
+    }
+
+    // Render original tap-to-select bounding boxes over recognized text lines
+    function renderLineBoxes(lines, imgWidth, imgHeight) {
+      overlayContainer.innerHTML = '';
+      
+      const rect = capturedImage.getBoundingClientRect();
+      const scaleX = rect.width / imgWidth;
+      const scaleY = rect.height / imgHeight;
+
+      // Handle both structured block returns and plain array results
+      const items = Array.isArray(lines) ? lines : [lines];
+
+      items.forEach(item => {
+        const rawText = (item.generated_text || item.text || '').trim();
+        if (rawText.length < 3) return;
+
+        // Bounding box mapping
+        const bbox = item.bbox || {
+          x0: imgWidth * 0.1,
+          y0: imgHeight * 0.4,
+          x1: imgWidth * 0.9,
+          y1: imgHeight * 0.5
+        };
+
+        const box = document.createElement('div');
+        box.className = 'box-target';
+        box.style.left = `${bbox.x0 * scaleX}px`;
+        box.style.top = `${bbox.y0 * scaleY}px`;
+        box.style.width = `${(bbox.x1 - bbox.x0) * scaleX}px`;
+        box.style.height = `${(bbox.y1 - bbox.y0) * scaleY}px`;
+
+        box.onclick = () => selectText(rawText);
+        overlayContainer.appendChild(box);
+      });
+    }
+
+    function selectText(rawText) {
+      let cleaned = rawText
+        .replace(/^(serial\s*no|serial\s*number|sn|mac\s*address|mac)[:\.\s\-=]+/i, '')
+        .trim();
+
+      selectView.classList.add('hidden');
+      qrView.classList.remove('hidden');
+      resultText.textContent = cleaned;
+      renderQRCode(cleaned);
+    }
+
+    function renderQRCode(text) {
+      qrcodeEl.innerHTML = '';
+      new QRCode(qrcodeEl, {
+        text: text || ' ',
+        width: 200,
+        height: 200,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+
+    resultText.oninput = () => renderQRCode(resultText.textContent);
+
+    document.getElementById('btn-retake').onclick = resetToCamera;
+    document.getElementById('btn-new-photo').onclick = resetToCamera;
+    document.getElementById('btn-pick-another').onclick = () => {
+      qrView.classList.add('hidden');
+      selectView.classList.remove('hidden');
     };
 
-    resultText.oninput = () => {
-      qrcodeEl.innerHTML = '';
-      new QRCode(qrcodeEl, { text: resultText.textContent || ' ', width: 160, height: 160 });
-    };
+    function resetToCamera() {
+      selectView.classList.add('hidden');
+      qrView.classList.add('hidden');
+      cameraView.classList.remove('hidden');
+      overlayContainer.innerHTML = '';
+    }
+
+    window.onload = initApp;
   </script>
 </body>
 </html>
