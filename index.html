@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#09090b" />
-  <title>Tap → QR</title>
+  <title>BIOS Tap → QR</title>
 
   <!-- External Dependencies -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -46,7 +46,6 @@
       overflow: hidden;
     }
 
-    /* --- Viewport & Camera Layout --- */
     .viewport {
       flex: 1;
       position: relative;
@@ -63,34 +62,33 @@
       object-fit: contain;
     }
 
-    /* Framing Guide Overlay */
     .view-finder {
       position: absolute;
-      width: 75%;
-      height: 45%;
+      width: 85%;
+      height: 55%;
       border: 2px dashed rgba(255, 255, 255, 0.4);
       border-radius: 16px;
       pointer-events: none;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
+      padding-top: 12px;
     }
 
     .view-finder::after {
-      content: "Align text within frame";
-      color: rgba(255, 255, 255, 0.6);
-      font-size: 0.85rem;
-      font-weight: 500;
+      content: "Position BIOS text inside frame";
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.8rem;
+      font-weight: 600;
       letter-spacing: 0.5px;
       text-transform: uppercase;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 6px 14px;
       border-radius: 20px;
       backdrop-filter: blur(4px);
     }
 
-    /* Target Interactive Box Overlays */
     #overlay-container {
       position: absolute;
       top: 0; left: 0;
@@ -100,21 +98,20 @@
 
     .box-target {
       position: absolute;
-      border: 2px solid var(--box-border);
+      border: 1.5px solid var(--box-border);
       background: var(--box-highlight);
-      border-radius: 6px;
+      border-radius: 4px;
       cursor: pointer;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      transition: transform 0.1s ease, background-color 0.15s ease;
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+      transition: transform 0.08s ease, background-color 0.12s ease;
     }
 
     .box-target:active {
-      transform: scale(0.96);
-      background: rgba(59, 130, 246, 0.6);
+      transform: scale(0.98);
+      background: rgba(59, 130, 246, 0.75);
       border-color: #ffffff;
     }
 
-    /* Loading Spinner Overlay */
     .loader-overlay {
       position: absolute;
       inset: 0;
@@ -141,7 +138,6 @@
       to { transform: rotate(360deg); }
     }
 
-    /* Controls Header & Footer */
     .control-bar {
       position: absolute;
       bottom: 0; left: 0; right: 0;
@@ -166,9 +162,7 @@
       transition: transform 0.1s ease;
     }
 
-    .shutter-btn:active {
-      transform: scale(0.92);
-    }
+    .shutter-btn:active { transform: scale(0.92); }
 
     .shutter-btn-inner {
       width: 62px; height: 62px;
@@ -190,11 +184,6 @@
       cursor: pointer;
     }
 
-    .icon-btn:active {
-      background: rgba(255,255,255,0.3);
-    }
-
-    /* Selection & QR Display Styles */
     .view-header {
       padding: 18px 20px;
       background: var(--bg-surface);
@@ -226,12 +215,9 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      transition: background-color 0.15s ease;
     }
 
-    button.btn:active {
-      background: var(--accent-hover);
-    }
+    button.btn:active { background: var(--accent-hover); }
 
     button.btn-secondary {
       background: var(--bg-card);
@@ -239,11 +225,6 @@
       border: 1px solid var(--border-color);
     }
 
-    button.btn-secondary:active {
-      background: var(--border-color);
-    }
-
-    /* Output QR Section */
     #qr-container-view {
       flex: 1;
       overflow-y: auto;
@@ -260,9 +241,6 @@
       padding: 20px;
       border-radius: 20px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
     .text-editor-card {
@@ -282,7 +260,6 @@
       text-transform: uppercase;
       color: var(--text-muted);
       font-weight: 700;
-      letter-spacing: 0.5px;
     }
 
     #result-text {
@@ -317,13 +294,13 @@
 
   <!-- SELECT VIEW -->
   <div id="select-view" class="view hidden">
-    <div class="view-header">Tap detected text to convert</div>
+    <div class="view-header" id="select-status">Tap target text to generate QR</div>
     <div class="viewport" id="select-viewport">
       <img id="captured-image" alt="Captured document" />
       <div id="overlay-container"></div>
       <div id="ocr-loader" class="loader-overlay">
         <div class="spinner"></div>
-        <div style="font-weight: 500;">Enhancing & Reading Text…</div>
+        <div style="font-weight: 500;">Detecting Serial Numbers & MACs…</div>
       </div>
     </div>
     <div class="action-bar">
@@ -344,13 +321,12 @@
       </div>
     </div>
     <div class="action-bar">
-      <button id="btn-pick-another" class="btn btn-secondary">Select Another</button>
+      <button id="btn-pick-another" class="btn btn-secondary">Select Another Line</button>
       <button id="btn-new-photo" class="btn">New Photo</button>
     </div>
   </div>
 
   <script>
-    // State & DOM Selectors
     const video = document.getElementById('video');
     const cameraView = document.getElementById('camera-view');
     const selectView = document.getElementById('select-view');
@@ -360,14 +336,13 @@
     const ocrLoader = document.getElementById('ocr-loader');
     const resultText = document.getElementById('result-text');
     const qrcodeEl = document.getElementById('qrcode');
+    const selectStatus = document.getElementById('select-status');
 
     let stream = null;
     let devices = [];
     let currentDeviceIdx = 0;
     let tesseractWorker = null;
-    let qrcodeInstance = null;
 
-    // Initialization
     async function initApp() {
       try {
         devices = (await navigator.mediaDevices.enumerateDevices())
@@ -375,138 +350,57 @@
         
         await startCamera({ facingMode: { ideal: 'environment' } });
       } catch (e) {
-        alert('Camera access is required to use this application.');
+        alert('Camera access is required.');
       }
     }
 
     async function startCamera(constraints) {
       if (stream) stream.getTracks().forEach(t => t.stop());
       
-      const defaultConstraints = {
-        video: {
-          width: { ideal: 3840 },
-          height: { ideal: 2160 },
-          ...constraints
-        },
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 3840 }, height: { ideal: 2160 }, ...constraints },
         audio: false
-      };
-
-      stream = await navigator.mediaDevices.getUserMedia(defaultConstraints);
+      });
       video.srcObject = stream;
-
-      // Enable continuous autofocus if supported by hardware
-      const track = stream.getVideoTracks()[0];
-      try {
-        const caps = track.getCapabilities?.();
-        if (caps?.focusMode?.includes('continuous')) {
-          await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
-        }
-      } catch (e) {}
     }
 
-    // Camera Switcher
     document.getElementById('btn-switch').onclick = () => {
       if (devices.length < 2) return;
       currentDeviceIdx = (currentDeviceIdx + 1) % devices.length;
       startCamera({ deviceId: { exact: devices[currentDeviceIdx].deviceId } });
     };
 
-    // Advanced Image Enhancement Pipeline (Sauvola Binarization & DPI Scaling)
+    // Fast screen-optimized normalization replaces Sauvola thresholding
     function preprocessCanvas(sourceCanvas) {
-      const maxDimension = 2000;
-      let width = sourceCanvas.width;
-      let height = sourceCanvas.height;
+      const maxDim = 1920;
+      let w = sourceCanvas.width;
+      let h = sourceCanvas.height;
 
-      if (width > maxDimension || height > maxDimension) {
-        if (width > height) {
-          height = Math.round((height * maxDimension) / width);
-          width = maxDimension;
-        } else {
-          width = Math.round((width * maxDimension) / height);
-          height = maxDimension;
-        }
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else { w = Math.round((w * maxDim) / h); h = maxDim; }
       }
 
       const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(sourceCanvas, 0, 0, width, height);
+      ctx.drawImage(sourceCanvas, 0, 0, w, h);
 
-      const imgData = ctx.getImageData(0, 0, width, height);
+      const imgData = ctx.getImageData(0, 0, w, h);
       const data = imgData.data;
-      const gray = new Float32Array(width * height);
 
-      // 1. Grayscale conversion
-      for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-        gray[j] = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      }
-
-      // 2. Local Sauvola Adaptive Binarization
-      const windowSize = 15;
-      const halfW = Math.floor(windowSize / 2);
-      const k = 0.2;
-      const R = 128;
-      const binary = new Uint8ClampedArray(width * height);
-
-      // Integral images for quick local mean & variance computation
-      const integral = new Float64Array((width + 1) * (height + 1));
-      const integralSq = new Float64Array((width + 1) * (height + 1));
-
-      for (let y = 0; y < height; y++) {
-        let rowSum = 0;
-        let rowSumSq = 0;
-        for (let x = 0; x < width; x++) {
-          const idx = y * width + x;
-          const val = gray[idx];
-          rowSum += val;
-          rowSumSq += val * val;
-
-          const iIdx = (y + 1) * (width + 1) + (x + 1);
-          integral[iIdx] = integral[iIdx - (width + 1)] + rowSum;
-          integralSq[iIdx] = integralSq[iIdx - (width + 1)] + rowSumSq;
-        }
-      }
-
-      function getAreaSum(arr, x1, y1, x2, y2) {
-        const w = width + 1;
-        return arr[y2 * w + x2] - arr[y1 * w + x2] - arr[y2 * w + x1] + arr[y1 * w + x1];
-      }
-
-      for (let y = 0; y < height; y++) {
-        const y1 = Math.max(0, y - halfW);
-        const y2 = Math.min(height, y + halfW + 1);
-
-        for (let x = 0; x < width; x++) {
-          const x1 = Math.max(0, x - halfW);
-          const x2 = Math.min(width, x + halfW + 1);
-
-          const count = (x2 - x1) * (y2 - y1);
-          const sum = getAreaSum(integral, x1, y1, x2, y2);
-          const sumSq = getAreaSum(integralSq, x1, y1, x2, y2);
-
-          const mean = sum / count;
-          const variance = (sumSq / count) - (mean * mean);
-          const stdDev = Math.sqrt(Math.max(0, variance));
-
-          const threshold = mean * (1 + k * ((stdDev / R) - 1));
-          const idx = y * width + x;
-          binary[idx] = gray[idx] < threshold ? 0 : 255;
-        }
-      }
-
-      // 3. Write processed data back to canvas
-      for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-        const val = binary[j];
-        data[i] = val;
-        data[i + 1] = val;
-        data[i + 2] = val;
+      // High-contrast grayscale mapping (preserves pixel fonts while stripping screen glow)
+      for (let i = 0; i < data.length; i += 4) {
+        let v = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+        v = (v - 50) * 1.4; // Contrast stretch
+        v = v < 0 ? 0 : (v > 255 ? 255 : v);
+        data[i] = v; data[i + 1] = v; data[i + 2] = v;
       }
       ctx.putImageData(imgData, 0, 0);
       return canvas;
     }
 
-    // Capture Photo Trigger
     document.getElementById('btn-capture').onclick = () => {
       if (!video.videoWidth) return;
 
@@ -521,11 +415,11 @@
       selectView.classList.remove('hidden');
       ocrLoader.classList.remove('hidden');
       overlayContainer.innerHTML = '';
+      selectStatus.textContent = "Analyzing BIOS Screen...";
 
       capturedImage.onload = () => runOCR(rawCanvas);
     };
 
-    // High Accuracy OCR Runner
     async function runOCR(rawCanvas) {
       try {
         const processedCanvas = preprocessCanvas(rawCanvas);
@@ -535,55 +429,60 @@
         }
 
         await tesseractWorker.setParameters({
-          tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
-          preserve_interword_spaces: '1'
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-:.()/ ',
+          tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK
         });
 
         const { data } = await tesseractWorker.recognize(processedCanvas);
-        renderBoundingBoxes(data.words || [], processedCanvas.width, processedCanvas.height);
+        selectStatus.textContent = "Tap desired text line to convert";
+        renderLineBoxes(data.lines || [], processedCanvas.width, processedCanvas.height);
       } catch (err) {
-        alert('Failed to read text from image. Please try again.');
+        alert('OCR engine failed. Please try again.');
         console.error(err);
       } finally {
         ocrLoader.classList.add('hidden');
       }
     }
 
-    // Render Clickable Targets Over Image
-    function renderBoundingBoxes(words, imgWidth, imgHeight) {
+    // Maps full line structures instead of broken word fragments
+    function renderLineBoxes(lines, imgWidth, imgHeight) {
       overlayContainer.innerHTML = '';
       
       const rect = capturedImage.getBoundingClientRect();
       const scaleX = rect.width / imgWidth;
       const scaleY = rect.height / imgHeight;
 
-      words.forEach(word => {
-        const cleanText = word.text.trim();
-        if (cleanText.length < 2) return;
+      lines.forEach(line => {
+        const rawText = line.text.trim();
+        if (rawText.length < 3) return;
 
         const box = document.createElement('div');
         box.className = 'box-target';
-        box.style.left = `${word.bbox.x0 * scaleX}px`;
-        box.style.top = `${word.bbox.y0 * scaleY}px`;
-        box.style.width = `${(word.bbox.x1 - word.bbox.x0) * scaleX}px`;
-        box.style.height = `${(word.bbox.y1 - word.bbox.y0) * scaleY}px`;
+        box.style.left = `${line.bbox.x0 * scaleX}px`;
+        box.style.top = `${(line.bbox.y0 - 2) * scaleY}px`;
+        box.style.width = `${(line.bbox.x1 - line.bbox.x0) * scaleX}px`;
+        box.style.height = `${(line.bbox.y1 - line.bbox.y0 + 4) * scaleY}px`;
 
-        box.onclick = () => selectText(cleanText);
+        box.onclick = () => selectText(rawText);
         overlayContainer.appendChild(box);
       });
     }
 
-    // Handle Selection & QR Generation
-    function selectText(text) {
+    // Strips common BIOS key labels automatically (e.g., "Serial Number: 5CD..." -> "5CD...")
+    function selectText(rawText) {
+      let cleaned = rawText
+        .replace(/^(serial\s*no|serial\s*number|sn|mac\s*address|mac|lan\s*mac)[:\.\s\-=]+/i, '')
+        .trim();
+
       selectView.classList.add('hidden');
       qrView.classList.remove('hidden');
-      resultText.textContent = text;
-      renderQRCode(text);
+      resultText.textContent = cleaned;
+      renderQRCode(cleaned);
     }
 
     function renderQRCode(text) {
       qrcodeEl.innerHTML = '';
-      qrcodeInstance = new QRCode(qrcodeEl, {
+      new QRCode(qrcodeEl, {
         text: text || ' ',
         width: 220,
         height: 220,
@@ -593,12 +492,8 @@
       });
     }
 
-    // Live QR Update on Text Edit
-    resultText.oninput = () => {
-      renderQRCode(resultText.textContent);
-    };
+    resultText.oninput = () => renderQRCode(resultText.textContent);
 
-    // Navigation Buttons
     document.getElementById('btn-retake').onclick = resetToCamera;
     document.getElementById('btn-new-photo').onclick = resetToCamera;
     
@@ -614,7 +509,6 @@
       overlayContainer.innerHTML = '';
     }
 
-    // Start App on Load
     window.onload = initApp;
   </script>
 </body>
