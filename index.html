@@ -803,44 +803,54 @@
                 // Run OCR with multiple configurations and pick the best result
                 const configs = [
                     {
-                        // First pass: Standard OCR with character whitelist
+                        // First pass: Standard OCR - more inclusive
                         tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
                         tessedit_pageseg_mode: '6',
                         preserve_interword_spaces: '1',
                         tessedit_ocr_engine_mode: '2',
                         tessedit_do_invert: '0',
-                        tessedit_unrej_any_wd: '1'
+                        tessedit_unrej_any_wd: '1',
+                        user_defined_dpi: '300'
                     },
                     {
-                        // Second pass: More aggressive character recognition
-                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:-.',
-                        tessedit_pageseg_mode: '11',
-                        preserve_interword_spaces: '0',
+                        // Second pass: Sparse text - good for serial numbers
+                        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:-. /',
+                        tessedit_pageseg_mode: '11', // Sparse text mode
+                        preserve_interword_spaces: '1',
                         tessedit_ocr_engine_mode: '2',
                         tessedit_unrej_any_wd: '1',
-                        classify_bln_numeric_mode: '1'
+                        user_defined_dpi: '300'
                     }
                 ];
                 
-                let bestResult = null;
-                let bestConfidence = 0;
+                let allResults = [];
                 
                 for (const config of configs) {
                     const result = await Tesseract.recognize(canvas, 'eng', config);
-                    
                     console.log('OCR confidence:', result.data.confidence);
-                    
-                    if (result.data.confidence > bestConfidence) {
-                        bestResult = result.data;
-                        bestConfidence = result.data.confidence;
+                    console.log('OCR text:', result.data.text);
+                    allResults.push(result.data);
+                }
+                
+                // Merge results - use words from both passes
+                let bestResult = allResults[0]; // Default to first result
+                
+                // If second pass found more words, use it
+                if (allResults[1] && allResults[1].words && allResults[1].words.length > allResults[0].words.length) {
+                    bestResult = allResults[1];
+                }
+                
+                // If neither found words, try to use text
+                if (!bestResult.words || bestResult.words.length === 0) {
+                    if (allResults[0].text) {
+                        bestResult = allResults[0];
                     }
                 }
                 
-                // Post-process the text to fix common OCR errors
+                // Post-process the text
                 if (bestResult) {
                     bestResult.text = fixOCRText(bestResult.text);
                     
-                    // Fix individual words too
                     if (bestResult.words) {
                         bestResult.words = bestResult.words.map(word => {
                             word.text = fixOCRText(word.text);
@@ -863,17 +873,14 @@
             let fixed = text;
             
             // Fix serial number patterns (like 5CD4345W4V)
-            // Pattern: letters and numbers mixed
             fixed = fixed.replace(/([A-Z0-9]{6,})/g, (match) => {
-                // For serial-like strings, apply specific corrections
                 let serial = match;
                 
                 // Fix common letter/number confusions in serial numbers
-                serial = serial.replace(/[wW]/g, 'W'); // w/W should usually be W
-                serial = serial.replace(/[aA]/g, 'A'); // a/A should usually be A
-                serial = serial.replace(/[vV]/g, 'V'); // v/V should usually be V
+                serial = serial.replace(/[wW]/g, 'W');
+                serial = serial.replace(/[aA]/g, 'A');
+                serial = serial.replace(/[vV]/g, 'V');
                 
-                // Don't over-correct numbers
                 return serial;
             });
             
@@ -889,6 +896,9 @@
             imageWidth = canvas.width;
             imageHeight = canvas.height;
             
+            // Store full text for fallback
+            window.ocrFullText = ocrData ? ocrData.text : '';
+            
             document.getElementById('app').style.display = 'none';
             document.getElementById('selectionScreen').style.display = 'flex';
             
@@ -899,27 +909,40 @@
             img.onload = () => {
                 document.getElementById('textOverlay').innerHTML = '';
                 
-                if (ocrData && ocrData.words) {
+                if (ocrData && ocrData.words && ocrData.words.length > 0) {
                     createTextBoxes(ocrData.words);
+                } else {
+                    // Fallback to text-based boxes
+                    createFallbackTextBoxes(document.getElementById('textOverlay'));
                 }
             };
         }
         
         function createTextBoxes(words) {
             const overlay = document.getElementById('textOverlay');
+            overlay.innerHTML = ''; // Clear existing boxes
             
-            // Filter words with good confidence
-            const goodWords = words.filter(word => word.confidence > 30);
+            console.log('Creating boxes from words:', words);
             
-            console.log('Total words:', words.length, 'Good words:', goodWords.length);
+            // DON'T filter by confidence - show ALL words
+            const allWords = words;
+            
+            console.log('Total words to display:', allWords.length);
             
             // Group words into lines
-            const lines = groupWordsIntoLines(goodWords);
+            const lines = groupWordsIntoLines(allWords);
             
             console.log('Lines found:', lines.length);
             
+            // If no lines found, try a different approach
+            if (lines.length === 0) {
+                createFallbackTextBoxes(overlay);
+                return;
+            }
+            
             lines.forEach((line, index) => {
-                if (line.text.trim().length < 3) return;
+                // Show ALL text, even short lines
+                if (line.text.trim().length < 1) return;
                 
                 const box = document.createElement('div');
                 box.className = 'text-box';
@@ -927,16 +950,20 @@
                 // Convert pixel coordinates to percentages
                 const leftPercent = (line.x / imageWidth) * 100;
                 const topPercent = (line.y / imageHeight) * 100;
-                const widthPercent = (line.width / imageWidth) * 100;
-                const heightPercent = (line.height / imageHeight) * 100;
+                const widthPercent = Math.max((line.width / imageWidth) * 100, 2); // Minimum 2% width
+                const heightPercent = Math.max((line.height / imageHeight) * 100, 1.5); // Minimum 1.5% height
                 
                 box.style.left = leftPercent + '%';
                 box.style.top = topPercent + '%';
                 box.style.width = widthPercent + '%';
-                box.style.height = Math.max(heightPercent, 3) + '%';
+                box.style.height = heightPercent + '%';
+                box.style.minHeight = '15px';
                 
-                // Store text as data attribute
+                // Store text
                 box.dataset.text = line.text;
+                
+                // Add title attribute for debugging
+                box.title = line.text;
                 
                 box.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -945,7 +972,7 @@
                 
                 overlay.appendChild(box);
                 
-                console.log(`Box ${index}: "${line.text}" at ${leftPercent.toFixed(1)}%, ${topPercent.toFixed(1)}%`);
+                console.log(`Box ${index}: "${line.text}" at ${leftPercent.toFixed(1)}%, ${topPercent.toFixed(1)}%, size: ${widthPercent.toFixed(1)}% x ${heightPercent.toFixed(1)}%`);
             });
             
             if (lines.length === 0) {
@@ -953,18 +980,61 @@
             }
         }
         
+        // Fallback: Create boxes from raw text lines
+        function createFallbackTextBoxes(overlay) {
+            // Use the full text from OCR
+            if (window.ocrFullText) {
+                const lines = window.ocrFullText.split('\n').filter(line => line.trim().length > 0);
+                
+                console.log('Fallback lines:', lines);
+                
+                // Create evenly spaced boxes for each line
+                lines.forEach((line, index) => {
+                    const box = document.createElement('div');
+                    box.className = 'text-box';
+                    
+                    // Estimate position based on line index
+                    const topPercent = (index / lines.length) * 100;
+                    
+                    box.style.left = '5%';
+                    box.style.top = topPercent + '%';
+                    box.style.width = '90%';
+                    box.style.height = (80 / lines.length) + '%';
+                    box.style.minHeight = '20px';
+                    
+                    box.dataset.text = line.trim();
+                    box.title = line.trim();
+                    
+                    box.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectText(line.trim(), box);
+                    });
+                    
+                    overlay.appendChild(box);
+                });
+            }
+        }
+        
         function groupWordsIntoLines(words) {
             const lines = [];
             let currentLine = null;
             
-            // Sort words by vertical position
-            const sortedWords = words.sort((a, b) => a.bbox.y0 - b.bbox.y0);
+            // Sort words by vertical position, then horizontal
+            const sortedWords = words.slice().sort((a, b) => {
+                const yDiff = a.bbox.y0 - b.bbox.y0;
+                if (Math.abs(yDiff) > 10) {
+                    return yDiff;
+                }
+                return a.bbox.x0 - b.bbox.x0;
+            });
             
             sortedWords.forEach(word => {
+                if (!word.bbox) return; // Skip words without bounding boxes
+                
                 const y = word.bbox.y0;
                 const height = word.bbox.y1 - word.bbox.y0;
                 
-                if (!currentLine || Math.abs(y - currentLine.y) > height * 0.5) {
+                if (!currentLine || Math.abs(y - currentLine.y) > height * 0.7) {
                     // New line
                     currentLine = {
                         text: word.text,
